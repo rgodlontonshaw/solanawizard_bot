@@ -1,8 +1,15 @@
+
+const moment = require('moment');
+
 const TelegramBot = require('node-telegram-bot-api');
+const NewPairFetcher = require('./src/api/NewPairFetcher');
+
+const pairFetcher = new NewPairFetcher(process.env.DEXTOOLS_API_KEY);
+
 
 // Replace 'YOUR_TELEGRAM_BOT_TOKEN' with the actual token you received from BotFather
 //const token = process.env.TELEGRAM_BOT_TOKEN;
-const token = '6820995483:AAE-Wgx69J3SSVLlnXoloDaHqiaVRtjrLjk';
+const token = process.env.TELEGRAM_BOT_TOKEN;
 
 // Create a bot instance that uses 'polling' to fetch new updates
 const bot = new TelegramBot(token, { polling: true });
@@ -66,16 +73,19 @@ bot.on('callback_query', (callbackQuery) => {
   }
 });
 
-// Additional command handlers can go here, like /sniper, /copytrade, etc.
-// ...
 
-// This is just an example for additional commands like /newtokens
-bot.onText(/\/newtokens/, (msg) => {
+
+
+
+bot.onText(/\/new/, (msg) => {
   const chatId = msg.chat.id;
-  // Logic to fetch and analyze new tokens
-  bot.sendMessage(chatId, "Fetching new Solana token pairs...");
-  // After fetching and analysis
-  bot.sendMessage(chatId, "New token pairs: ...");
+  bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
+
+  // Start the polling process within the NewPairFetcher class
+  pairFetcher.startPolling();
+
+  // Optionally, you can listen for new pairs from the NewPairFetcher and send updates to the chat
+  // This requires NewPairFetcher to have some event emitter for new pairs
 });
 
 // Listen for any other text messages
