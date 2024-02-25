@@ -187,9 +187,38 @@ bot.on('message', (msg) => {
   }
 });
 
-// Implement the transferSOL function as before
 async function transferSOL(chatId, recipientAddress, amount) {
-  // Implement transfer logic...
+  try {
+    // Connect to the Solana cluster
+    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'));
+
+    // Get the sender's wallet keypair
+    const senderWallet = getSenderWallet(); // Implement this function to retrieve the sender's wallet keypair
+
+    // Construct the transfer instruction
+    const instruction = solanaWeb3.SystemProgram.transfer({
+      fromPubkey: senderWallet.publicKey,
+      toPubkey: new solanaWeb3.PublicKey(recipientAddress),
+      lamports: solanaWeb3.LAMPORTS_PER_SOL * amount, // Amount in SOL (convert to lamports)
+    });
+
+    // Sign and send the transaction
+    const transaction = new solanaWeb3.Transaction().add(instruction);
+    const signature = await solanaWeb3.sendAndConfirmTransaction(
+      connection,
+      transaction,
+      [senderWallet], // Array of signing keypairs
+      { commitment: 'confirmed' } // Wait for the transaction to be confirmed
+    );
+
+    // Transaction successful
+    console.log('Transaction successful:', signature);
+    bot.sendMessage(chatId, `Successfully transferred ${amount} SOL to ${recipientAddress}`);
+  } catch (error) {
+    // Transaction failed
+    console.error('Transaction failed:', error);
+    bot.sendMessage(chatId, 'Failed to transfer SOL. Please try again later.');
+  }
 }
 
 // Handle the /start command
