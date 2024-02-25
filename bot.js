@@ -52,6 +52,21 @@ function getStartMenuKeyboard() {
 };
 }
 
+function encryptPrivateKey(privateKey, encryptionKey) {
+  const cipher = crypto.createCipher('aes-256-cbc', encryptionKey);
+  let encrypted = cipher.update(privateKey, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return encrypted;
+}
+
+// Function to decrypt the private key
+function decryptPrivateKey(encryptedPrivateKey, encryptionKey) {
+  const decipher = crypto.createDecipher('aes-256-cbc', encryptionKey);
+  let decrypted = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
+
 // Handle /start command
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id.toString(); // Firestore document ID must be a string
@@ -60,19 +75,25 @@ bot.onText(/\/start/, async (msg) => {
   let doc = await userWalletDoc.get();
 
   let publicKey; // Variable to hold the public key
+  let decryptedPrivateKey;
 
   if (!doc.exists) {
     // If the user doesn't have a wallet, create a new one and use its public key
     const newWallet = await createSolanaWallet();
+    // Encrypt the private key before storing it
+    const encryptedPrivateKey = encryptPrivateKey(newWallet.secretKey.toString('base64'), yourEncryptionKey);
+  
     await userWalletDoc.set({
       publicKey: newWallet.publicKey.toString(),
-      // Consider the security implications of storing private keys
+      privateKey: encryptedPrivateKey, // Store the encrypted private key
     });
+    
     publicKey = newWallet.publicKey;
   } else {
     // If the user already has a wallet, retrieve its public key from Firestore
     let walletData = doc.data();
     publicKey = new solanaWeb3.PublicKey(walletData.publicKey);
+    decryptedPrivateKey = decryptPrivateKey(walletData.privateKey, yourEncryptionKey);
   }
 
   // Fetch SOL balance using the public key
@@ -120,9 +141,12 @@ bot.on('callback_query', (callbackQuery) => {
       bot.sendMessage(chatId, 'Profile functionality will be implemented soon.');
       break;
     case 'sol_transfer':
-      transferState[chatId] = { stage: 'input_address' };
-      bot.sendMessage(chatId, 'Please enter the recipient SOL address:');
-      break;
+      transferState[chatId] = { stage: 'input_address_amount' };
+      bot.sendMessage(chatId, 'Enter Addresses with Amounts\n' +
+        'The address and amount are separated by commas.\n\n' +
+        'Example:\n' +
+        'EwR1MRLoXEQR8qTn1AF8ydwujqdMZVs53giNbDCxich,0.001');
+    break;
     case 'trades_history':
       // Implement Trades History functionality
       bot.sendMessage(chatId, 'Trades History functionality will be implemented soon.');
@@ -163,29 +187,25 @@ bot.on('callback_query', (callbackQuery) => {
   }
 });
 
-// Listen for messages to handle different stages of the transfer process
-bot.on('message', (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text;
 
-  // Check if we are in the 'input_address' stage for this chatId
-  if (transferState[chatId] && transferState[chatId].stage === 'input_address') {
-    // Save the address and prompt for the amount
-    transferState[chatId] = { stage: 'input_amount', address: text };
-    bot.sendMessage(chatId, 'Please enter the amount of SOL to transfer:');
-  } else if (transferState[chatId] && transferState[chatId].stage === 'input_amount') {
-    // We have the address and the amount, perform the transfer
-    const amount = parseFloat(text);
-    if (isNaN(amount)) {
-      bot.sendMessage(chatId, 'Invalid amount. Please enter a number.');
-    } else {
-      // Call the function to perform the transfer (to be implemented)
-      transferSOL(chatId, transferState[chatId].address, amount);
-      // Reset the transfer state
-      transferState[chatId] = {};
-    }
+function getSenderWallet() {
+  // Ensure that the SENDER_PRIVATE_KEY environment variable is set
+  if (!process.env.SENDER_PRIVATE_KEY) {
+    throw new Error('Sender private key is not set in the environment variables');
   }
-});
+
+  // The private key should be stored as a base58 encoded string
+  const privateKeyBase58 = decryptedPrivateKey;
+
+  // Convert base58 private key to Uint8Array
+  const privateKey = Uint8Array.from(Buffer.from(privateKeyBase58, 'base58'));
+
+  // Create a keypair from the secret key
+  const keypair = solanaWeb3.Keypair.fromSecretKey(privateKey);
+
+  return keypair;
+}
+
 
 async function transferSOL(chatId, recipientAddress, amount) {
   try {
@@ -193,13 +213,13 @@ async function transferSOL(chatId, recipientAddress, amount) {
     const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'));
 
     // Get the sender's wallet keypair
-    const senderWallet = getSenderWallet(); // Implement this function to retrieve the sender's wallet keypair
+    const senderWallet = getSenderWallet(); // Replace with your function to securely retrieve the sender's wallet keypair
 
     // Construct the transfer instruction
     const instruction = solanaWeb3.SystemProgram.transfer({
       fromPubkey: senderWallet.publicKey,
       toPubkey: new solanaWeb3.PublicKey(recipientAddress),
-      lamports: solanaWeb3.LAMPORTS_PER_SOL * amount, // Amount in SOL (convert to lamports)
+      lamports: solanaWeb3.LAMPORTS_PER_SOL * amount, // Convert amount to lamports
     });
 
     // Sign and send the transaction
@@ -208,16 +228,18 @@ async function transferSOL(chatId, recipientAddress, amount) {
       connection,
       transaction,
       [senderWallet], // Array of signing keypairs
-      { commitment: 'confirmed' } // Wait for the transaction to be confirmed
+      { commitment: 'confirmed' }
     );
 
     // Transaction successful
     console.log('Transaction successful:', signature);
+    // Use your actual bot instance to send a message
     bot.sendMessage(chatId, `Successfully transferred ${amount} SOL to ${recipientAddress}`);
   } catch (error) {
     // Transaction failed
     console.error('Transaction failed:', error);
-    bot.sendMessage(chatId, 'Failed to transfer SOL. Please try again later.');
+    // Use your actual bot instance to send a message
+    bot.sendMessage(chatId, `Failed to transfer SOL: ${error.message}. Please try again later.`);
   }
 }
 
@@ -253,8 +275,11 @@ bot.onText(/\/profile/, (msg) => {
 
 // Handle the /soltransfer command
 bot.onText(/\/soltransfer/, (msg) => {
-  // Your code to handle the soltransfer command
-  bot.sendMessage(msg.chat.id, 'Preparing to transfer SOL tokens...');
+  transferState[chatId] = { stage: 'input_address_amount' };
+  bot.sendMessage(chatId, 'Enter Addresses with Amounts\n' +
+    'The address and amount are separated by commas.\n\n' +
+    'Example:\n' +
+    'EwR1MRLoXEQR8qTn1AF8ydwujqdMZVs53giNbDCxich,0.001');
 });
 
 // Handle the /trades_history command
@@ -275,13 +300,30 @@ bot.onText(/\/newpairs/, (msg) => {
 });
 
 
-// Listen for any other text messages
-bot.on('message', (msg) => {
-  if (msg.text.startsWith('/')) {
-      // Ignore commands (already handled)
-      return;
-  }
+bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, "I didn't recognize that command. Try /start to see all available commands.");
-});
+  const text = msg.text;
 
+  if (!text || text.startsWith('/')) return;
+
+  // Handle input for address and amount
+  if (transferState[chatId] && transferState[chatId].stage === 'input_address_amount') {
+    // Split the input by comma to get the address and amount
+    const [address, amountString] = text.split(',');
+    const amount = parseFloat(amountString);
+
+    if (address && !isNaN(amount)) {
+      // Perform the transfer
+      await transferSOL(chatId, address.trim(), amount);
+      // Reset the transfer state
+      transferState[chatId] = {};
+    } else {
+      // Inform user of incorrect format
+      bot.sendMessage(chatId, 'Invalid format. Please enter the address and amount separated by a comma.');
+    }
+  } else {
+    // Handle other non-command messages or default case
+    bot.sendMessage(chatId, "I didn't recognize that command. Try /start to see all available commands.");
+  }
+transferState[chatId] = {};
+});
