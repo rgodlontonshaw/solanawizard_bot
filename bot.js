@@ -18,7 +18,8 @@ const NewPairFetcher = require('./src/api/NewPairFetcher'); // Adjust the path a
 const pairFetcher =  new NewPairFetcher(process.env.DEXTOOLS_API_KEY);
 
 
-const token = '6820995483:AAGHg_jkICyGlzDBy0kAoWgcZPUzQmWhuxo';
+const token = process.env.TELEGRAM_BOT_TOKEN;
+
 const bot = new TelegramBot(token, { polling: true });
 
 const db = admin.firestore();
@@ -82,12 +83,13 @@ bot.onText(/\/start/, async (msg) => {
 
   // Fetch SOL balance using the public key
   const solBalance = await getSolBalance(publicKey);
-
+  const solscanUrl = `https://solscan.io/account/${publicKey.toString()}`; // Construct the Solscan URL
   const welcomeMessage = `Solana Wizard Bot: Your Gateway to Solana DeFi Professional Trading\n\n` +
                          `Your Wallet Address\n` +
                          `${publicKey.toString()}\n` +
                          `Balance: ${solBalance.toFixed(6)} SOL\n\n` +
-                         `View on Explorer`;
+                         `View on Explorer: ${solscanUrl}`; 
+  
 
   bot.sendMessage(chatId, welcomeMessage, getStartMenuKeyboard());
 });
