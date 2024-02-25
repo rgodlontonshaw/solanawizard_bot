@@ -1,3 +1,6 @@
+
+const moment = require('moment');
+
 const TelegramBot = require('node-telegram-bot-api');
 const admin = require('firebase-admin');
 const solanaWeb3 = require('@solana/web3.js');
@@ -11,12 +14,13 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
-// Replace 'YOUR_TELEGRAM_BOT_TOKEN' with the actual token you received from BotFather
-//const token = process.env.TELEGRAM_BOT_TOKEN;
-const token = '6820995483:AAGHg_jkICyGlzDBy0kAoWgcZPUzQmWhuxo';
+const NewPairFetcher = require('./src/api/NewPairFetcher'); // Adjust the path as per your directory structure
 
 
-// Create a bot instance that uses 'polling' to fetch new updates
+const pairFetcher =  new NewPairFetcher(process.env.DEXTOOLS_API_KEY);
+
+
+const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 
 const db = admin.firestore();
@@ -49,6 +53,7 @@ function getStartMenuKeyboard() {
               [{ text: 'Settings', callback_data: 'settings' }],
               [{ text: 'Help', callback_data: 'help' }],
               [{ text: 'Close', callback_data: 'close' }],
+              [{ text: 'NewPairs', callback_data: 'newpairs' }],
           ],
       }),
   };
@@ -114,16 +119,20 @@ bot.on('callback_query', (callbackQuery) => {
   }
 });
 
-// Additional command handlers can go here, like /sniper, /copytrade, etc.
-// ...
 
-// This is just an example for additional commands like /newtokens
-bot.onText(/\/newtokens/, (msg) => {
+
+
+
+bot.onText(/\/newpairs/, (msg) => {
   const chatId = msg.chat.id;
-  // Logic to fetch and analyze new tokens
-  bot.sendMessage(chatId, "Fetching new Solana token pairs...");
-  // After fetching and analysis
-  bot.sendMessage(chatId, "New token pairs: ...");
+  bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
+
+  // Start the polling process within the NewPairFetcher class
+  pairFetcher.startPolling();
+  
+  pairFetcher.on('newPair', (pair) => {
+    bot.sendMessage(chatId, `New Pair Detected!\nName: ${pair.tokenName}\nAddress: ${pair.tokenAddress}`);
+});
 });
 
 // Listen for any other text messages

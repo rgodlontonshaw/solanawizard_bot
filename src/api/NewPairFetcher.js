@@ -1,17 +1,51 @@
-import axios from 'axios';
+const axios = require('axios');
+const EventEmitter = require('events');
 
 
-class NewPairFetcher {
+class NewPairFetcher extends EventEmitter {
+    constructor(apiKey) {
+        super();
+        this.apiBaseUrl = 'https://public-api.dextools.io/trial/v2/pool/solana/';
+        this.headers = {
+            'accept': 'application/json',
+            'x-api-key': apiKey
+        };
+        this.POLL_INTERVAL = 2100; 
+    }
+
     async fetchNewPairs() {
+        const to = new Date().toISOString();
+        const from = new Date(Date.now() - 7000).toISOString(); 
         try {
-            const response = await axios.get(`${this.apiBaseUrl}/newPairsEndpoint`); // Replace '/newPairsEndpoint' with the actual endpoint
-            const pairs = response.data; // Adjust based on the API response structure
-            console.log(pairs); // For debugging, remove or replace with proper logging
-            return pairs; // Return the fetched pairs for further processing
+            axios.get(this.apiBaseUrl, {
+                headers: this.headers,
+                params: {
+                    sort: 'creationTime',
+                    order: 'desc',
+                    from: from,
+                    to: to,
+                    page: 0,
+                    pageSize: 50
+                }
+            }).then(res => {
+                const pairs = res.data.data.results;
+                console.log(pairs);
+                pairs.forEach(pair => {
+                    const mainTokenName = pair.mainToken.name;
+                    const mainTokenAddress = pair.mainToken.address;
+                    this.emit('newPair', { tokenName: mainTokenName, tokenAddress: mainTokenAddress});
+                });
+            });
         } catch (error) {
-            console.error('Error fetching new pairs:', error);
-            throw error; // Rethrow or handle as needed
+            console.error('Error fetching new tokens:', error);
+            this.emit('error', error);
+            throw error;
         }
+    }
+
+    startPolling() {
+        this.fetchNewPairs();
+        setInterval(() => this.fetchNewPairs(), this.POLL_INTERVAL);
     }
 }
 
