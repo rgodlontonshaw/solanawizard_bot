@@ -93,7 +93,7 @@ bot.onText(/\/start/, async (msg) => {
     // If the user already has a wallet, retrieve its public key from Firestore
     let walletData = doc.data();
     publicKey = new solanaWeb3.PublicKey(walletData.publicKey);
-    decryptedPrivateKey = decryptPrivateKey(walletData.privateKey, yourEncryptionKey);
+   // decryptedPrivateKey = decryptPrivateKey(walletData.privateKey, yourEncryptionKey);
   }
 
   // Fetch SOL balance using the public key
