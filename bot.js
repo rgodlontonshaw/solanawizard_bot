@@ -2,9 +2,11 @@
 const moment = require('moment');
 
 const TelegramBot = require('node-telegram-bot-api');
-const NewPairFetcher = require('./src/api/NewPairFetcher');
 
-const pairFetcher = new NewPairFetcher(process.env.DEXTOOLS_API_KEY);
+const NewPairFetcher = require('./src/api/NewPairFetcher'); // Adjust the path as per your directory structure
+
+
+const pairFetcher =  new NewPairFetcher(process.env.DEXTOOLS_API_KEY);
 
 
 // Replace 'YOUR_TELEGRAM_BOT_TOKEN' with the actual token you received from BotFather
@@ -32,6 +34,7 @@ function getStartMenuKeyboard() {
               [{ text: 'New Token Bot', callback_data: 'new_token_bot' }],
               [{ text: 'Help', callback_data: 'help' }],
               [{ text: 'Close', callback_data: 'close' }],
+              [{ text: 'NewPairs', callback_data: 'newpairs' }],
           ],
       }),
   };
@@ -77,15 +80,16 @@ bot.on('callback_query', (callbackQuery) => {
 
 
 
-bot.onText(/\/new/, (msg) => {
+bot.onText(/\/newpairs/, (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
 
   // Start the polling process within the NewPairFetcher class
   pairFetcher.startPolling();
-
-  // Optionally, you can listen for new pairs from the NewPairFetcher and send updates to the chat
-  // This requires NewPairFetcher to have some event emitter for new pairs
+  
+  pairFetcher.on('newPair', (pair) => {
+    bot.sendMessage(chatId, `New Pair Detected!\nName: ${pair.tokenName}\nAddress: ${pair.tokenAddress}`);
+});
 });
 
 // Listen for any other text messages
