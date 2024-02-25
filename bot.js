@@ -1,6 +1,4 @@
-
 const moment = require('moment');
-
 const TelegramBot = require('node-telegram-bot-api');
 const admin = require('firebase-admin');
 const solanaWeb3 = require('@solana/web3.js');
@@ -20,7 +18,7 @@ const NewPairFetcher = require('./src/api/NewPairFetcher'); // Adjust the path a
 const pairFetcher =  new NewPairFetcher(process.env.DEXTOOLS_API_KEY);
 
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
+const token = '6820995483:AAGHg_jkICyGlzDBy0kAoWgcZPUzQmWhuxo';
 const bot = new TelegramBot(token, { polling: true });
 
 const db = admin.firestore();
@@ -35,7 +33,7 @@ async function createSolanaWallet() {
 // Function to fetch SOL balance
 async function getSolBalance(pubKey) {
   const balance = await connection.getBalance(new solanaWeb3.PublicKey(pubKey));
-  return balance / solanaWeb3.LAMPORTS_PER_SOL; // Convert lamports to SOL
+  return balance / solanaWeb3.LAMPORTS_PER_SOL; 
 }
 
 // This function creates an inline keyboard layout for the start menu
@@ -66,6 +64,8 @@ bot.onText(/\/start/, async (msg) => {
   let userWalletDoc = db.collection('userWallets').doc(chatId);
   let doc = await userWalletDoc.get();
 
+  let publicKey; // Variable to hold the public key
+
   if (!doc.exists) {
     // If the user doesn't have a wallet, create a new one and use its public key
     const newWallet = await createSolanaWallet();
@@ -73,25 +73,22 @@ bot.onText(/\/start/, async (msg) => {
       publicKey: newWallet.publicKey.toString(),
       // Consider the security implications of storing private keys
     });
-
-    const solBalance = await getSolBalance(newWallet.publicKey);
-
-    bot.sendMessage(chatId, `New wallet created!\nYour public key is: ${newWallet.publicKey.toString()}\nBalance: ${solBalance.toFixed(6)} SOL`, getStartMenuKeyboard());
+    publicKey = newWallet.publicKey;
   } else {
     // If the user already has a wallet, retrieve its public key from Firestore
     let walletData = doc.data();
-    const solBalance = await getSolBalance(walletData.publicKey);
-
-    bot.sendMessage(chatId, `You already have a wallet.\nYour public key is: ${walletData.publicKey}\nBalance: ${solBalance.toFixed(6)} SOL`, getStartMenuKeyboard());
+    publicKey = new solanaWeb3.PublicKey(walletData.publicKey);
   }
 
- const solBalance = await getSolBalance(userWallet);
+  // Fetch SOL balance using the public key
+  const solBalance = await getSolBalance(publicKey);
 
- const welcomeMessage = `Solana Wizard Bot: Your Gateway to Solana DeFi Professional Trading\n\n` +
-                        `Your Wallet Address\n` +
-                        `${userWallet}\n` +
-                        `Balance: ${solBalance.toFixed(6)} SOL\n\n` +
-                        `View on Explorer`;
+  const welcomeMessage = `Solana Wizard Bot: Your Gateway to Solana DeFi Professional Trading\n\n` +
+                         `Your Wallet Address\n` +
+                         `${publicKey.toString()}\n` +
+                         `Balance: ${solBalance.toFixed(6)} SOL\n\n` +
+                         `View on Explorer`;
+
   bot.sendMessage(chatId, welcomeMessage, getStartMenuKeyboard());
 });
 
