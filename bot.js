@@ -72,11 +72,14 @@ bot.on('callback_query', async (callbackQuery) => {
       bot.sendMessage(chatId, 'Trades History functionality will be implemented soon.');
       break;
     case 'newpairs':
+      const chatId = msg.chat.id;
       bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
-      // pairFetcher.startPolling();
-      // pairFetcher.on('newPair', (pair) => {
-      //   bot.sendMessage(chatId, `New Pair Detected!\nName: ${pair.tokenName}\nAddress: ${pair.tokenAddress}`);
-      // });
+    
+      // Start the polling process within the NewPairFetcher class
+      pairFetcher.startPolling();
+      pairFetcher.on('newPair', (pair) => {
+        bot.sendMessage(chatId, `New Pair Detected!\nName: ${pair.tokenName}\nAddress: ${pair.tokenAddress}`);
+      });
       break;
     case 'referral_system':
       // Implement Referral System functionality
@@ -194,14 +197,13 @@ bot.onText(/\/trades_history/, (msg) => {
 
 // Handle the /newpairs command
 bot.onText(/\/newpairs/, (msg) => {
-  bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
-
+  bot.sendMessage(msg.chat.id, "Starting to fetch new Solana token pairs...");
+    
   // Start the polling process within the NewPairFetcher class
-  //pairFetcher.startPolling();
-
-  // pairFetcher.on('newPair', (pair) => {
-  //   bot.sendMessage(chatId, `New Pair Detected!\nName: ${pair.tokenName}\nAddress: ${pair.tokenAddress}`);
-  // });
+  pairFetcher.startPolling();
+  pairFetcher.on('newPair', (pair) => {
+    bot.sendMessage(msg.chat.id, `New Pair Detected!\nName: ${pair.tokenName}\nAddress: ${pair.tokenAddress}`);
+  });
 });
 
 

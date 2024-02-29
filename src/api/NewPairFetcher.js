@@ -1,7 +1,6 @@
 const axios = require('axios');
 const EventEmitter = require('events');
 
-
 class NewPairFetcher extends EventEmitter {
     constructor(apiKey) {
         super();
@@ -10,12 +9,12 @@ class NewPairFetcher extends EventEmitter {
             'accept': 'application/json',
             'x-api-key': apiKey
         };
-        this.POLL_INTERVAL = 2100; 
+        this.POLL_INTERVAL = 2000; 
     }
 
     async fetchNewPairs() {
         const to = new Date().toISOString();
-        const from = new Date(Date.now() - 7000).toISOString(); 
+        const from = new Date(Date.now() - 5000).toISOString(); 
         try {
             axios.get(this.apiBaseUrl, {
                 headers: this.headers,
