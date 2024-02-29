@@ -7,6 +7,7 @@ const NewPairFetcher = require('./src/api/NewPairFetcher');
 const solanaWeb3 = require('@solana/web3.js');
 const { transferSOL } = require('./src/transactions/solanaTransactions');
 const pairFetcher = new NewPairFetcher(process.env.DEXTOOLS_API_KEY);
+const SettingsScreen = require('./src/settings/Settings');
 const { Keypair } = require('@solana/web3.js');
 const bs58 = require('bs58');
 require('dotenv').config();
@@ -32,6 +33,12 @@ bot.on('callback_query', async (callbackQuery) => {
   // Reset transfer state if starting a new transfer or if any other button is pressed
   if (data !== 'input_amount' && data !== 'input_address') {
     transferState[chatId] = {};
+  }
+
+  if (data.startsWith('toggle_') || data.startsWith('set_')) {
+    const settingsScreen = new SettingsScreen(bot, chatId);
+    await settingsScreen.handleButtonPress(data);
+    return; // Stop further processing since we handled the settings action
   }
 
   // Define the logic for each callback data
@@ -86,8 +93,11 @@ bot.on('callback_query', async (callbackQuery) => {
       bot.sendMessage(chatId, 'Referral System functionality will be implemented soon.');
       break;
     case 'settings':
-      // Implement Settings functionality
-      bot.sendMessage(chatId, 'Settings functionality will be implemented soon.');
+      if (data.startsWith('toggle_') || data.startsWith('set_')) {
+        const settingsScreen = new SettingsScreen(bot, chatId);
+        await settingsScreen.handleButtonPress(data);
+        return; // Stop further processing since we handled the settings action
+      };
       break;
     case 'close':
       try {
@@ -204,6 +214,12 @@ bot.onText(/\/newpairs/, (msg) => {
   pairFetcher.on('newPair', (pair) => {
     bot.sendMessage(msg.chat.id, `New Pair Detected!\nName: ${pair.tokenName}\nAddress: ${pair.tokenAddress}`);
   });
+});
+
+bot.onText(/\/settings/, async (msg) => {
+  const chatId = msg.chat.id;
+  const settingsScreen = new SettingsScreen(bot, chatId);
+  await settingsScreen.showSettings();
 });
 
 
