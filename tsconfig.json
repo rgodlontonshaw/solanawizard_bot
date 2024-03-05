@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "es6", // or a later version like "es2020"
+    "module": "es2020",
+    "outDir": "./dist", // Output directory for compiled files
+    "rootDir": "./src", // Root directory of source files
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "allowJs": true,
+    "declaration": true
+  },
+  "include": ["src/**/*"]
+}
