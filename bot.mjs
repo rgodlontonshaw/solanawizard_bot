@@ -1,9 +1,8 @@
 import {SolanaService} from './src/solana/SolanaService.mjs';
 import { KeyboardLayouts } from './src/ui/KeyboardLayouts.mjs';
-import solanaWeb3 from '@solana/web3.js';
+import * as solanaWeb3 from '@solana/web3.js';
 import { transferSOL } from './src/transactions/solanaTransactions.mjs';
 import { SettingsScreen } from './src/settings/Settings.mjs';
-import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
 import TelegramBot from 'node-telegram-bot-api';
 const token = process.env.TELEGRAM_BOT_TOKEN;
