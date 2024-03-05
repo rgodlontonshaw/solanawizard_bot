@@ -1,4 +1,4 @@
-class SettingsScreen {
+export class SettingsScreen {
     constructor(bot, chatId) {
         this.bot = bot;
         this.chatId = chatId;
@@ -78,5 +78,3 @@ class SettingsScreen {
         await this.bot.editMessageReplyMarkup(options.reply_markup, { chat_id: options.chat_id, message_id: options.message_id });
     }
 }
-
-module.exports = SettingsScreen;

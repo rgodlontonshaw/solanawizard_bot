@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+import admin from 'firebase-admin';
 let serviceAccount = require('../../firebase/atiani-firebase-adminsdk-25rzh-9816d96174.json');
 
 admin.initializeApp({

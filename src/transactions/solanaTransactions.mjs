@@ -1,9 +1,10 @@
-const solanaWeb3 = require('@solana/web3.js');
-require('dotenv').config();
-const { Keypair } = require("@solana/web3.js");
-const bs58 = require('bs58');
+import solanaWeb3 from '@solana/web3.js';
+import dotenv from 'dotenv';
+dotenv.config();
+import { Keypair } from "@solana/web3.js";
+import bs58 from 'bs58';
 
-async function transferSOL(db, bot, chatId, recipientAddress, amountSol) {
+export async function transferSOL(db, bot, chatId, recipientAddress, amountSol) {
     try {
         if (!chatId) throw new Error('Chat ID is missing or invalid.');
         if (!recipientAddress) throw new Error('Recipient address is missing or invalid.');
@@ -55,5 +56,3 @@ async function transferSOL(db, bot, chatId, recipientAddress, amountSol) {
         bot.sendMessage(chatId, `Failed to transfer SOL: ${error.message}. Please try again later.`);
     }
 }
-
-module.exports = { transferSOL };

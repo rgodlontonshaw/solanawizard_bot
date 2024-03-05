@@ -1,16 +1,14 @@
-require('dotenv').config();
-const bot = require('./src/bot/TelegramBotService');
-const db = require('./src/db/FirebaseService');
-const SolanaService = require('./src/solana/SolanaService');
-const KeyboardLayouts = require('./src/ui/KeyboardLayouts');
-const NewPairFetcher = require('./src/api/NewPairFetcher');
-const solanaWeb3 = require('@solana/web3.js');
-const { transferSOL } = require('./src/transactions/solanaTransactions');
-const pairFetcher = new NewPairFetcher(process.env.DEXTOOLS_API_KEY);
-const SettingsScreen = require('./src/settings/Settings');
-const { Keypair } = require('@solana/web3.js');
-const bs58 = require('bs58');
-require('dotenv').config();
+import { SolanaService } from './src/solana/SolanaService.mjs';
+import { KeyboardLayouts } from './src/ui/KeyboardLayouts.mjs';
+import solanaWeb3 from '@solana/web3.js';
+import { transferSOL } from './src/transactions/solanaTransactions.mjs';
+import { SettingsScreen } from './src/settings/Settings.mjs';
+import { Keypair } from '@solana/web3.js';
+import bs58 from 'bs58';
+import TelegramBot from 'node-telegram-bot-api';
+const token = process.env.TELEGRAM_BOT_TOKEN;
+const bot = new TelegramBot(token, { polling: true });
+
 
 let transferState = {};
 
@@ -82,11 +80,17 @@ bot.on('callback_query', async (callbackQuery) => {
       const chatId = msg.chat.id;
       bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
     
-      // Start the polling process within the NewPairFetcher class
-      pairFetcher.startPolling();
-      pairFetcher.on('newPair', (pair) => {
-        bot.sendMessage(chatId, `New Pair Detected!\nName: ${pair.tokenName}\nAddress: ${pair.tokenAddress}`);
-      });
+      try {
+        const newPairs = await pairFetcher.getNewPairs(); 
+        newPairs.forEach(pair => {
+          const message = `🆕 New Pair Detected!\n🪙 Name: ${pair.name}\n📝 Address: ${pair.address}\n💹 Volume: ${pair.volume}`;
+          bot.sendMessage(chatId, message);
+        });
+      } catch (error) {
+        console.error('Failed to fetch new pairs:', error);
+        bot.sendMessage(chatId, "Failed to fetch new pairs. Please try again later.");
+      }
+    
       break;
     case 'referral_system':
       // Implement Referral System functionality
@@ -206,14 +210,19 @@ bot.onText(/\/trades_history/, (msg) => {
 });
 
 // Handle the /newpairs command
-bot.onText(/\/newpairs/, (msg) => {
+bot.onText(/\/newpairs/, async (msg) => {
   bot.sendMessage(msg.chat.id, "Starting to fetch new Solana token pairs...");
     
-  // Start the polling process within the NewPairFetcher class
-  pairFetcher.startPolling();
-  pairFetcher.on('newPair', (pair) => {
-    bot.sendMessage(msg.chat.id, `New Pair Detected!\nName: ${pair.tokenName}\nAddress: ${pair.tokenAddress}`);
-  });
+  try {
+    const newPairs = await pairFetcher.getNewPairs(); 
+    newPairs.forEach(pair => {
+      const message = `🆕 New Pair Detected!\n🪙 Name: ${pair.name}\n📝 Address: ${pair.address}\n💹 Volume: ${pair.volume}`;
+      bot.sendMessage(chatId, message);
+    });
+  } catch (error) {
+    console.error('Failed to fetch new pairs:', error);
+    bot.sendMessage(chatId, "Failed to fetch new pairs. Please try again later.");
+  }
 });
 
 bot.onText(/\/settings/, async (msg) => {
@@ -250,3 +259,28 @@ bot.on('message', async (msg) => {
   }
   transferState[chatId] = {};
 });
+
+
+async function displayNewPairInfo(chatId) {
+  try {
+    const newPairs = await pairFetcher.fetchNewPairs(); 
+    if (newPairs.length === 0) {
+      await bot.sendMessage(chatId, "No new pairs found.");
+      return;
+    }
+    let messageText = "🚀 New Token Pairs:\n\n";
+    newPairs.forEach((pair, index) => {
+      messageText += `${index + 1}. ${pair.name} (${pair.symbol})\n`;
+      messageText += `Description: ${pair.description}\n`;
+      messageText += `Website: ${pair.web || 'N/A'}\n`;
+      messageText += `Twitter: ${pair.twitter || 'N/A'}\n`;
+      messageText += `Telegram: ${pair.telegram || 'N/A'}\n\n`;
+    });
+    await bot.sendMessage(chatId, messageText);
+  } catch (error) {
+    console.error("Failed to display new pair info:", error);
+    await bot.sendMessage(chatId, "Failed to fetch new pair information. Please try again later.");
+  }
+}
+
+const pairFetcher = new NewPairFetcher();

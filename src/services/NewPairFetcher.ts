@@ -4,6 +4,7 @@ import {
   } from '@raydium-io/raydium-sdk';
   import {
     Connection,
+    PublicKey,
     Commitment,
   } from '@solana/web3.js';
   import { RAYDIUM_LIQUIDITY_PROGRAM_ID_V4 } from '../liquidity';

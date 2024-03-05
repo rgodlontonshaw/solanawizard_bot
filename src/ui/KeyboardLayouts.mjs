@@ -1,4 +1,4 @@
-class KeyboardLayouts {
+export class KeyboardLayouts {
     static getStartMenuKeyboard() {
         return {
             reply_markup: JSON.stringify({
@@ -25,4 +25,3 @@ class KeyboardLayouts {
     }
   }
   
-  module.exports = KeyboardLayouts;
