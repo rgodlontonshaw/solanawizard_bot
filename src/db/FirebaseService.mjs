@@ -1,5 +1,5 @@
 import admin from 'firebase-admin';
-let serviceAccount = require('../../firebase/atiani-firebase-adminsdk-25rzh-9816d96174.json');
+import serviceAccount from '../../firebase/atiani-firebase-adminsdk-25rzh-9816d96174.json' assert { type: 'json' };
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -7,4 +7,4 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-module.exports = db;
+export default db;
