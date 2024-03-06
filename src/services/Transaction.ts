@@ -24,35 +24,20 @@ import {
   VersionedTransaction,
   Commitment,
 } from '@solana/web3.js';
-import { getTokenAccounts, RAYDIUM_LIQUIDITY_PROGRAM_ID_V4, OPENBOOK_PROGRAM_ID, createPoolKeys } from '../liquidity/liquidity';
-import { retrieveEnvVariable } from '../utils/utils';
-import { getMinimalMarketV3, MinimalMarketLayoutV3 } from '../market/market.ts';
-import pino from 'pino';
+import { getTokenAccounts, RAYDIUM_LIQUIDITY_PROGRAM_ID_V4, OPENBOOK_PROGRAM_ID, createPoolKeys } from '../liquidity/liquidity.js';
+import { retrieveEnvVariable } from '../utils/utils.js';
+import { getMinimalMarketV3 } from '../market/market.js';
+import {pino} from 'pino';
 import bs58 from 'bs58';
 import * as fs from 'fs';
 import * as path from 'path';
 import BN from 'bn.js';
 
-const transport = pino.transport({
-targets: [
-  {
-    level: 'trace',
-    target: 'pino-pretty',
-    options: {},
-  },
-],
-});
-
-export const logger = pino(
-{
+export const logger = pino({
   redact: ['poolKeys'],
-  serializers: {
-    error: pino.stdSerializers.err,
-  },
+  serializers: pino.stdSerializers,
   base: undefined,
-},
-transport,
-);
+});
 
 const network: string = 'mainnet-beta';
 const RPC_ENDPOINT: string = retrieveEnvVariable('RPC_ENDPOINT', logger);

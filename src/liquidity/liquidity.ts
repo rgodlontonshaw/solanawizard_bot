@@ -1,4 +1,4 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, Commitment } from '@solana/web3.js';
 import pkg from '@raydium-io/raydium-sdk';
 const { Liquidity, MAINNET_PROGRAM_ID, Market, SPL_ACCOUNT_LAYOUT, publicKey, struct } = pkg;
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
@@ -84,14 +84,14 @@ export interface TokenAccount {
 export async function getTokenAccounts(
   connection: Connection,
   owner: PublicKey,
-  commitment: string,
+  commitment: Commitment | undefined,
 ): Promise<TokenAccount[]> {
   const tokenResp = await connection.getTokenAccountsByOwner(
     owner,
     {
       programId: TOKEN_PROGRAM_ID,
     },
-    commitment,
+    { commitment },
   );
 
   const accounts: TokenAccount[] = [];

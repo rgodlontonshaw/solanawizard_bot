@@ -1,11 +1,10 @@
-import { LIQUIDITY_STATE_LAYOUT_V4 } from '@raydium-io/raydium-sdk';
 import * as solanaWeb3 from '@solana/web3.js';
 import { RAYDIUM_LIQUIDITY_PROGRAM_ID_V4 } from '../liquidity/liquidity.js';
 import { retrieveEnvVariable } from '../utils/utils.js';
-import pino from 'pino';
-import { Metaplex, programs } from '@metaplex-foundation/js';
-import fetch from 'node-fetch';
-const { metadata: { Metadata } } = programs;
+import { Metaplex,Metadata  } from '@metaplex-foundation/js';
+import {pino} from 'pino';
+import { program } from '@project-serum/anchor/dist/cjs/native/system.js';
+
 
 const transport = pino.transport({
   targets: [{
@@ -15,16 +14,19 @@ const transport = pino.transport({
   }],
 });
 
-export const logger = pino(
-  {
-    redact: ['poolKeys'],
-    serializers: {
-      error: pino.stdSerializers.err,
-    },
-    base: undefined,
-  },
-  transport,
-);
+const logger = pino(transport);
+
+import {
+  Liquidity,
+  LIQUIDITY_STATE_LAYOUT_V4,
+  LiquidityPoolKeys,
+  LiquidityStateV4,
+  MARKET_STATE_LAYOUT_V3,
+  MarketStateV3,
+  Token,
+  TokenAmount,
+} from '@raydium-io/raydium-sdk';
+
 
 const network: string = 'mainnet-beta';
 const RPC_ENDPOINT: string = retrieveEnvVariable('RPC_ENDPOINT', logger);
