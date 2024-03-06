@@ -9,7 +9,7 @@ const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 import db from "./src/db/FirebaseService.mjs";
 import { Keypair, PublicKey } from "@solana/web3.js";
-//import * as NewPairFetcherModule from './src/services/NewPairFetcher.mjs';
+import { startListeningForNewPairs } from './src/services/NewPairFetcher.mjs';
 import { HelpScreen } from "./src/help/Help.mjs";
 
 let transferState = {};
@@ -82,19 +82,10 @@ bot.on("callback_query", async (callbackQuery) => {
     case "newpairs":
       bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
 
-      try {
-        const newPairs = await NewPairFetcherModule.getNewPairs();
-        newPairs.forEach((pair) => {
-          const message = `🆕 New Pair Detected!\n🪙 Name: ${pair.name}\n📝 Address: ${pair.address}\n💹 Volume: ${pair.volume}`;
-          bot.sendMessage(chatId, message);
-        });
-      } catch (error) {
-        console.error("Failed to fetch new pairs:", error);
-        bot.sendMessage(
-          chatId,
-          "Failed to fetch new pairs. Please try again later.",
-        );
-      }
+      startListeningForNewPairs((newPair) => {
+        const message = formatNewPairMessage(newPair);
+        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+      });
 
       break;
     case "referral_system":

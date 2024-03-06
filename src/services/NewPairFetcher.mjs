@@ -40,7 +40,13 @@ const commitment = solanaWeb3.Commitment;
 
 let existingLiquidityPools = new Set();
 
-const runListener = async () => {
+// At the end of the file, export the runListener function
+export const startListeningForNewPairs = (onNewPair) => {
+  runListener(onNewPair);
+};
+
+// Modify the existing runListener function
+const runListener = async (onNewPair) => {
 const runTimestamp = Math.floor(new Date().getTime() / 1000);
 const raydiumSubscriptionId = solanaConnection.onProgramAccountChange(
   RAYDIUM_LIQUIDITY_PROGRAM_ID_V4,
@@ -53,7 +59,11 @@ const raydiumSubscriptionId = solanaConnection.onProgramAccountChange(
       const metadataPda = metaplex.nfts().pdas().metadata({ mint: poolState.baseMint });
       const tokenDetails = await Metadata.fromAccountAddress(solanaConnection, metadataPda);
       logger.info(tokenDetails.data.uri);
-      fetchTokenMetadata(tokenDetails.data.uri);
+      fetchTokenMetadata(tokenDetails.data.uri).then(metadata => {
+        if (onNewPair) {
+          onNewPair(metadata); // Invoke the callback with the metadata
+        }
+      });
     }
   },
   commitment,
