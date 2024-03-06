@@ -55,14 +55,14 @@ const runListener = async (onNewPair: (metadata: any) => void): Promise<void> =>
     
       if (parseInt(poolState.poolOpenTime.toString()) > runTimestamp && !existingLiquidityPools.has(key)) {
         existingLiquidityPools.add(key);
-        const metadataPda: solanaWeb3.PublicKey = await Metadata.getPDA(poolState.baseMint);
-        const tokenDetails: any = await Metadata.load(solanaConnection, metadataPda);
-        logger.info(tokenDetails.data.uri);
-        fetchTokenMetadata(tokenDetails.data.uri).then((metadata: any) => {
-          if (onNewPair) {
-            onNewPair(metadata); // Invoke the callback with the metadata
-          }
-        });
+        // const metadataPda: solanaWeb3.PublicKey = await Metadata.getPDA(poolState.baseMint);
+        // const tokenDetails: any = await Metadata.load(solanaConnection, metadataPda);
+        // logger.info(tokenDetails.data.uri);
+        // fetchTokenMetadata(tokenDetails.data.uri).then((metadata: any) => {
+        //   if (onNewPair) {
+        //     onNewPair(metadata); // Invoke the callback with the metadata
+        //   }
+        // });
       }
     },
     commitment,

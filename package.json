@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node bot.ts",
-    "dev": "nodemon bot.ts",
+    "dev": "nodemon --exec node --loader ts-node/esm bot.ts",
     "build": "tsc"
   },
   "type": "module",

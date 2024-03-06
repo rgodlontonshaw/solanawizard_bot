@@ -1,6 +1,6 @@
 import { SolanaService } from "./src/solana/SolanaService";
 import { KeyboardLayouts } from "./src/ui/KeyboardLayouts";
-import { SettingsScreen } from "./src/settings/Settings.mjs"; // Fixed import path
+import { SettingsScreen } from "./src/settings/Settings"; // Fixed import path
 import bs58 from "bs58";
 import TelegramBot, { SendMessageOptions } from "node-telegram-bot-api";
 import db from "./src/db/FirebaseService";
@@ -217,7 +217,8 @@ async function transferSOL(chatId: string, recipientAddress: string, amountSol: 
       let doc = await db.collection('userWallets').doc(chatId.toString()).get();
       if (!doc.exists) throw new Error('Wallet not found for the user.');
       const walletData = doc.data();
-      if (!walletData || !walletData.secretKey) throw new Error('Wallet data is missing or incomplete.');
+      if (!walletData) throw new Error('Wallet data is missing or incomplete.');
+      if (!walletData.secretKey) throw new Error('Secret key is missing from wallet data.');
 
       // Decode the Base58 encoded secret key
       const secretKey = bs58.decode(walletData.secretKey);

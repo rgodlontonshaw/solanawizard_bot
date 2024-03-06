@@ -1,16 +1,14 @@
 {
   "compilerOptions": {
-    "target": "es6", // or a later version like "es2020"
-    "outDir": "./dist", // Output directory for compiled files
-    "rootDir": "./src", // Root directory of source files
+    "target": "es6",
+    "module": "commonjs",
     "strict": true,
-    "module": "nodenext", 
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "Node16",
-    "allowJs": true,
-    "declaration": true,
-    "resolveJsonModule": true
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "*": ["node_modules/*", "src/types/*"]
+    }
   },
   "include": ["src/**/*"]
 }

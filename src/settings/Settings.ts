@@ -1,5 +1,19 @@
 export class SettingsScreen {
-    constructor(bot, chatId) {
+    private bot: any;
+    private chatId: string;
+    private settingsMessageId: number | null;
+    private settings: {
+        autoBuy: boolean;
+        autoSell: boolean;
+        antiMEV: boolean;
+        slippageBuySell: number;
+        slippageSniper: number;
+        tipSOL: number;
+        wsolSnipe: boolean;
+        showBirdEyePreview: boolean;
+    };
+
+    constructor(bot: any, chatId: string) {
         this.bot = bot;
         this.chatId = chatId;
         this.settingsMessageId = null; // This will store the settings message id
@@ -15,7 +29,7 @@ export class SettingsScreen {
         };
     }
   
-    async showSettings() {
+    async showSettings(): Promise<void> {
         const options = {
             reply_markup: JSON.stringify({
                 inline_keyboard: this.generateInlineKeyboard()
@@ -27,7 +41,7 @@ export class SettingsScreen {
         this.settingsMessageId = sentMessage.message_id;
     }
   
-    generateInlineKeyboard() {
+    generateInlineKeyboard(): Array<Array<{text: string; callback_data: string}>> {
         return [
             [{ text: `Auto Buy: ${this.settings.autoBuy ? '✅ Active - 0.1 SOL' : '❌ Inactive'}`, callback_data: 'toggle_auto_buy' }],
             [{ text: `Auto Sell: ${this.settings.autoSell ? '✅ Active - 30%' : '❌ Inactive'}`, callback_data: 'toggle_auto_sell' }],
@@ -42,7 +56,7 @@ export class SettingsScreen {
         ];
     }
   
-    async handleButtonPress(action) {
+    async handleButtonPress(action: string): Promise<void> {
         // Toggling settings based on the action
         switch (action) {
             case 'toggle_auto_buy':
@@ -61,7 +75,7 @@ export class SettingsScreen {
         await this.updateSettingsKeyboard();
     }
 
-    async updateSettingsKeyboard() {
+    async updateSettingsKeyboard(): Promise<void> {
         if (this.settingsMessageId === null) {
             console.error('Settings message ID not set. Cannot update the message.');
             return;
