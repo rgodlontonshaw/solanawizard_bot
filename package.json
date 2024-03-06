@@ -9,7 +9,6 @@
     "dev": "nodemon --exec node --loader ts-node/esm bot.ts",
     "build": "tsc"
   },
-  "type": "module",
   "keywords": [],
   "author": "",
   "license": "ISC",

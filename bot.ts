@@ -2,11 +2,11 @@ import { SolanaService } from "./src/solana/SolanaService";
 import { KeyboardLayouts } from "./src/ui/KeyboardLayouts";
 import { SettingsScreen } from "./src/settings/Settings"; // Fixed import path
 import bs58 from "bs58";
-import TelegramBot, { SendMessageOptions } from "node-telegram-bot-api";
+import TelegramBot from "node-telegram-bot-api";
 import db from "./src/db/FirebaseService";
 import { startListeningForNewPairs } from './src/services/NewPairFetcher';
 import { HelpScreen } from "./src/help/Help";
-import solanaWeb3, {   Keypair,Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction } from '@solana/web3.js';
+import solanaWeb3, { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction } from '@solana/web3.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -16,12 +16,11 @@ interface TransferState {
 
 let transferState: TransferState = {};
 
-// Assuming bot is initialized somewhere in the file, if not, it should be initialized as follows:
-const token = 'YOUR_TELEGRAM_BOT_TOKEN';
+const token = process.env.TELEGRAM_BOT_TOKEN || ''; 
 const bot = new TelegramBot(token, { polling: true });
 
 // Handle callback queries from the inline keyboard
-bot.on("callback_query", async (callbackQuery: TelegramBot.CallbackQuery) => {
+bot.on("callback_query", async (callbackQuery) => {
   const message = callbackQuery.message!;
   const data = callbackQuery.data!;
   const action = callbackQuery.data!;
@@ -71,9 +70,9 @@ bot.on("callback_query", async (callbackQuery: TelegramBot.CallbackQuery) => {
         "Example:\n" +
         "EwR1MRLoXEQR8qTn1AF8ydwujqdMZVs53giNbDCxich,0.001",
         {
-          reply_markup: {
+          reply_markup: JSON.stringify({
             force_reply: true,
-          },
+          }),
         },
       );
 
@@ -157,8 +156,8 @@ async function start(chatId: string): Promise<void> {
   bot.sendMessage(chatId, welcomeMessage, {
     parse_mode: "HTML",
     disable_web_page_preview: true,
-    reply_markup: KeyboardLayouts.getStartMenuKeyboard(),
-  } as unknown as SendMessageOptions);
+    reply_markup: JSON.stringify(KeyboardLayouts.getStartMenuKeyboard()),
+  });
 }
 
 async function getProfile(chatId: string): Promise<void> {
@@ -190,8 +189,8 @@ async function getProfile(chatId: string): Promise<void> {
   bot.sendMessage(chatId, profileMessage, {
     parse_mode: "Markdown",
     disable_web_page_preview: true, // Disable URL preview
-    reply_markup: KeyboardLayouts.getProfileMenuKeyboard(),
-  } as unknown as SendMessageOptions);
+    reply_markup: JSON.stringify(KeyboardLayouts.getProfileMenuKeyboard()),
+  });
 }
 
 async function deleteWallet(chatId: string): Promise<void> {
