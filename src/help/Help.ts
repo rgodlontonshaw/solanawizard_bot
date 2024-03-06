@@ -1,11 +1,14 @@
 export class HelpScreen {
-  constructor(bot, chatId) {
+  private bot: any; // Assuming bot is of a generic type, replace 'any' with the specific type if available
+  private chatId: string;
+
+  constructor(bot: any, chatId: string) {
     this.bot = bot;
     this.chatId = chatId;
   }
 
-  async showHelp() {
-    const helpMessage = 
+  async showHelp(): Promise<void> {
+    const helpMessage: string = 
       `*Help:*\n\n` +
       `*Which tokens can I trade?*\n` +
       `Any SPL token that is a Sol pair, on Raydium, Orca, and Jupiter. We pick up raydium pairs instantly, and Jupiter will pick up non sol pairs within around 15 minutes.\n\n` +
@@ -21,7 +24,7 @@ export class HelpScreen {
       `Yes, our bot does trading for you with certain strategies.\n\n` +
       `Further questions? Join our Telegram group: https://t.me/SolWizardBotAlpha`;
 
-    const options = {
+    const options: { parse_mode: string; reply_markup: string; } = {
       parse_mode: 'Markdown',
       reply_markup: JSON.stringify({
         inline_keyboard: [

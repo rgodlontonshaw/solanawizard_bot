@@ -1,6 +1,14 @@
+interface TokenInfo {
+  name: string;
+  symbol: string;
+  description: string;
+  image: string;
+  web: string;
+  twitter: string;
+  telegram: string;
+}
 
-/** @type {TokenInfo} */
-const solTokenInfo = {
+const solTokenInfo: TokenInfo = {
   name: "Example Token",
   symbol: "EXMPL",
   description: "This is an example token.",
@@ -9,4 +17,3 @@ const solTokenInfo = {
   twitter: "http://twitter.com/exampletoken",
   telegram: "http://t.me/exampletoken",
 };
-

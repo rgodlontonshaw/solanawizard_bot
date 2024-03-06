@@ -1,6 +1,6 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import pkg from '@raydium-io/raydium-sdk';
-const { Liquidity, LiquidityPoolKeys, MAINNET_PROGRAM_ID, Market, TokenAccount, SPL_ACCOUNT_LAYOUT, publicKey, struct } = pkg;
+const { Liquidity, MAINNET_PROGRAM_ID, Market, SPL_ACCOUNT_LAYOUT, publicKey, struct } = pkg;
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
 export const RAYDIUM_LIQUIDITY_PROGRAM_ID_V4 = MAINNET_PROGRAM_ID.AmmV4;
@@ -13,18 +13,40 @@ export const MINIMAL_MARKET_STATE_LAYOUT_V3 = struct([
   publicKey('asks'),
 ]);
 
+export interface AccountData {
+  baseMint: PublicKey;
+  quoteMint: PublicKey;
+  lpMint: PublicKey;
+  baseDecimals: number;
+  quoteDecimals: number;
+  openOrders: PublicKey;
+  targetOrders: PublicKey;
+  baseVault: PublicKey;
+  quoteVault: PublicKey;
+  marketProgramId: PublicKey;
+  marketId: PublicKey;
+  withdrawQueue: PublicKey;
+  lpVault: PublicKey;
+}
+
+export interface MinimalMarketLayoutV3 {
+  bids: PublicKey;
+  asks: PublicKey;
+  eventQueue: PublicKey;
+}
+
 export function createPoolKeys(
-  id,
-  accountData,
-  minimalMarketLayoutV3,
+  id: string,
+  accountData: AccountData,
+  minimalMarketLayoutV3: MinimalMarketLayoutV3,
 ) {
   return {
     id,
     baseMint: accountData.baseMint,
     quoteMint: accountData.quoteMint,
     lpMint: accountData.lpMint,
-    baseDecimals: accountData.baseDecimals.toNumber(), // Fixed typo from baseDecimal to baseDecimals
-    quoteDecimals: accountData.quoteDecimals.toNumber(), // Fixed typo from quoteDecimal to quoteDecimals
+    baseDecimals: accountData.baseDecimals, // Fixed typo from baseDecimal to baseDecimals
+    quoteDecimals: accountData.quoteDecimals, // Fixed typo from quoteDecimal to quoteDecimals
     lpDecimals: 5,
     version: 4,
     programId: RAYDIUM_LIQUIDITY_PROGRAM_ID_V4,
@@ -53,11 +75,17 @@ export function createPoolKeys(
   };
 }
 
+export interface TokenAccount {
+  pubkey: PublicKey;
+  programId: PublicKey;
+  accountInfo: any; // Ideally, define a more specific type for accountInfo
+}
+
 export async function getTokenAccounts(
-  connection,
-  owner,
-  commitment,
-) {
+  connection: Connection,
+  owner: PublicKey,
+  commitment: string,
+): Promise<TokenAccount[]> {
   const tokenResp = await connection.getTokenAccountsByOwner(
     owner,
     {
@@ -66,7 +94,7 @@ export async function getTokenAccounts(
     commitment,
   );
 
-  const accounts = [];
+  const accounts: TokenAccount[] = [];
   for (const { pubkey, account } of tokenResp.value) {
     accounts.push({
       pubkey,

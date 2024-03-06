@@ -1,8 +1,8 @@
 import pkg from '@raydium-io/raydium-sdk';
 const { LIQUIDITY_STATE_LAYOUT_V4 } = pkg;
 import * as solanaWeb3 from '@solana/web3.js';
-import { RAYDIUM_LIQUIDITY_PROGRAM_ID_V4 } from '../liquidity/liquidity.mjs';
-import { retrieveEnvVariable } from '../utils/utils.mjs';
+import { RAYDIUM_LIQUIDITY_PROGRAM_ID_V4 } from '../liquidity/liquidity.js';
+import { retrieveEnvVariable } from '../utils/utils.js';
 import pino from 'pino';
 import { Metaplex } from '@metaplex-foundation/js';
 import Metadata from "@metaplex-foundation/mpl-token-metadata";
@@ -27,39 +27,37 @@ export const logger = pino(
 transport,
 );
 
-const network = 'mainnet-beta';
-const RPC_ENDPOINT = retrieveEnvVariable('RPC_ENDPOINT', logger);
-const RPC_WEBSOCKET_ENDPOINT = retrieveEnvVariable('RPC_WEBSOCKET_ENDPOINT', logger);
+const network: string = 'mainnet-beta';
+const RPC_ENDPOINT: string = retrieveEnvVariable('RPC_ENDPOINT', logger);
+const RPC_WEBSOCKET_ENDPOINT: string = retrieveEnvVariable('RPC_WEBSOCKET_ENDPOINT', logger);
 
-const solanaConnection = new solanaWeb3.Connection(RPC_ENDPOINT, {
+const solanaConnection: solanaWeb3.Connection = new solanaWeb3.Connection(RPC_ENDPOINT, {
 wsEndpoint: RPC_WEBSOCKET_ENDPOINT,
 });
-const metaplex = Metaplex.make(solanaConnection);
+const metaplex: Metaplex = Metaplex.make(solanaConnection);
 
-const commitment = solanaWeb3.Commitment;
+const commitment: solanaWeb3.Commitment = 'confirmed';
 
-let existingLiquidityPools = new Set();
+let existingLiquidityPools: Set<string> = new Set();
 
-// At the end of the file, export the runListener function
-export const startListeningForNewPairs = (onNewPair) => {
+export const startListeningForNewPairs = (onNewPair: (metadata: any) => void): void => {
   runListener(onNewPair);
 };
 
-// Modify the existing runListener function
-const runListener = async (onNewPair) => {
-const runTimestamp = Math.floor(new Date().getTime() / 1000);
-const raydiumSubscriptionId = solanaConnection.onProgramAccountChange(
+const runListener = async (onNewPair: (metadata: any) => void): Promise<void> => {
+const runTimestamp: number = Math.floor(new Date().getTime() / 1000);
+const raydiumSubscriptionId: number = solanaConnection.onProgramAccountChange(
   RAYDIUM_LIQUIDITY_PROGRAM_ID_V4,
-  async (updatedAccountInfo) => {
-    const key = updatedAccountInfo.accountId.toString();
-    const poolState = LIQUIDITY_STATE_LAYOUT_V4.decode(updatedAccountInfo.accountInfo.data);
+  async (updatedAccountInfo: solanaWeb3.AccountInfo<Buffer>) => {
+    const key: string = updatedAccountInfo.accountId.toString();
+    const poolState: any = LIQUIDITY_STATE_LAYOUT_V4.decode(updatedAccountInfo.accountInfo.data);
   
     if (parseInt(poolState.poolOpenTime.toString()) > runTimestamp && !existingLiquidityPools.has(key)) {
       existingLiquidityPools.add(key);
-      const metadataPda = metaplex.nfts().pdas().metadata({ mint: poolState.baseMint });
-      const tokenDetails = await Metadata.fromAccountAddress(solanaConnection, metadataPda);
+      const metadataPda: solanaWeb3.PublicKey = metaplex.nfts().pdas().metadata({ mint: poolState.baseMint });
+      const tokenDetails: any = await Metadata.fromAccountAddress(solanaConnection, metadataPda);
       logger.info(tokenDetails.data.uri);
-      fetchTokenMetadata(tokenDetails.data.uri).then(metadata => {
+      fetchTokenMetadata(tokenDetails.data.uri).then((metadata: any) => {
         if (onNewPair) {
           onNewPair(metadata); // Invoke the callback with the metadata
         }
@@ -72,14 +70,14 @@ const raydiumSubscriptionId = solanaConnection.onProgramAccountChange(
 logger.info(`Listening for Raydium pool changes: ${raydiumSubscriptionId}`);
 };
 
-async function fetchTokenMetadata(uri) {
+async function fetchTokenMetadata(uri: string): Promise<any> {
 try {
-  const response = await fetch(uri);
+  const response: Response = await fetch(uri);
   if (!response.ok) {
     throw new Error(`Error fetching metadata: ${response.statusText}`);
   }
-  const metadata = await response.json();
-  const tokenData = {
+  const metadata: any = await response.json();
+  const tokenData: any = {
     name: metadata.name,
     symbol: metadata.symbol,
     description: metadata.description,
@@ -95,8 +93,8 @@ try {
 }
 }
 
-function extractURL(description, type) {
-let regex;
+function extractURL(description: string, type: string): string | undefined {
+let regex: RegExp | undefined;
 
 switch (type) {
   case 'telegram':
@@ -112,7 +110,7 @@ switch (type) {
 
 if (!regex) return undefined;
 
-const match = regex.exec(description);
+const match: RegExpExecArray | null = regex.exec(description);
 return match ? match[1] : undefined;
 }
 runListener();

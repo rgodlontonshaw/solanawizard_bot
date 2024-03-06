@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
-import { MARKET_STATE_LAYOUT_V3 } from '@raydium-io/raydium-sdk';
+import { MARKET_STATE_LAYOUT_V3, MINIMAL_MARKET_STATE_LAYOUT_V3 } from '@raydium-io/raydium-sdk';
 
-export async function getMinimalMarketV3(connection, marketId, commitment) {
+export async function getMinimalMarketV3(connection: Connection, marketId: PublicKey, commitment: string): Promise<unknown> {
   const marketInfo = await connection.getAccountInfo(marketId, {
     commitment,
     dataSlice: {

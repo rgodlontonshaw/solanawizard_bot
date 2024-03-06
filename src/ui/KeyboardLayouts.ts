@@ -1,5 +1,5 @@
 export class KeyboardLayouts {
-    static getStartMenuKeyboard() {
+    static getStartMenuKeyboard(): { reply_markup: string } {
         return {
             reply_markup: JSON.stringify({
                 inline_keyboard: [
@@ -13,7 +13,7 @@ export class KeyboardLayouts {
         };
     }
   
-    static getProfileMenuKeyboard() {
+    static getProfileMenuKeyboard(): { reply_markup: string } {
         return {
             reply_markup: JSON.stringify({
               inline_keyboard: [
@@ -23,4 +23,3 @@ export class KeyboardLayouts {
         };
     }
   }
-  

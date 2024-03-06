@@ -1,10 +1,11 @@
-import solanaWeb3 from '@solana/web3.js';
+import solanaWeb3, { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction } from '@solana/web3.js';
 import dotenv from 'dotenv';
 dotenv.config();
-import { Keypair } from "@solana/web3.js";
 import bs58 from 'bs58';
 
-export async function transferSOL(db, bot, chatId, recipientAddress, amountSol) {
+import { Db, Bot } from '../types'; 
+
+export async function transferSOL(db: Db, bot: Bot, chatId: string, recipientAddress: string, amountSol: number): Promise<void> {
     try {
         if (!chatId) throw new Error('Chat ID is missing or invalid.');
         if (!recipientAddress) throw new Error('Recipient address is missing or invalid.');
@@ -26,28 +27,28 @@ export async function transferSOL(db, bot, chatId, recipientAddress, amountSol) 
         const senderKeypair = Keypair.fromSecretKey(secretKey);
 
         // Setup the connection to the Solana cluster
-        const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+        const connection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
         
         // Calculate the lamports to transfer
-        const lamports = amountSol * solanaWeb3.LAMPORTS_PER_SOL;
+        const lamports = amountSol * LAMPORTS_PER_SOL;
 
         // Check if the sender account has enough balance to cover the transaction
         const senderBalance = await connection.getBalance(senderKeypair.publicKey);
         if (senderBalance < lamports) {
-            throw new Error(`Insufficient funds: Your balance is ${senderBalance / solanaWeb3.LAMPORTS_PER_SOL} SOL, but the transaction requires at least ${amountSol} SOL.`);
+            throw new Error(`Insufficient funds: Your balance is ${senderBalance / LAMPORTS_PER_SOL} SOL, but the transaction requires at least ${amountSol} SOL.`);
         }
 
         // Prepare the transaction
-        let transaction = new solanaWeb3.Transaction().add(
-            solanaWeb3.SystemProgram.transfer({
+        let transaction = new Transaction().add(
+            SystemProgram.transfer({
                 fromPubkey: senderKeypair.publicKey,
-                toPubkey: new solanaWeb3.PublicKey(recipientAddress),
+                toPubkey: new PublicKey(recipientAddress),
                 lamports,
             })
         );
 
         // Sign and send the transaction
-        var signature = await solanaWeb3.sendAndConfirmTransaction(connection, transaction, [senderKeypair]);
+        var signature = await sendAndConfirmTransaction(connection, transaction, [senderKeypair]);
 
         console.log('Transaction successful:', signature);
         bot.sendMessage(chatId, `Successfully transferred ${amountSol} SOL to ${recipientAddress}`);

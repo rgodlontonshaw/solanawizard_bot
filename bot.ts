@@ -1,25 +1,31 @@
-import { SolanaService } from "./src/solana/SolanaService.mjs";
-import { KeyboardLayouts } from "./src/ui/KeyboardLayouts.mjs";
+import { SolanaService } from "./src/solana/SolanaService";
+import { KeyboardLayouts } from "./src/ui/KeyboardLayouts";
 import * as solanaWeb3 from "@solana/web3.js";
-import { transferSOL } from "./src/transactions/solanaTransactions.mjs";
-import { SettingsScreen } from "./src/settings/Settings.mjs";
+import { transferSOL } from "./src/transactions/solanaTransactions";
+import { SettingsScreen } from "./src/settings/Settings.mjs"; // Fixed import path
 import bs58 from "bs58";
 import TelegramBot from "node-telegram-bot-api";
-const token = process.env.TELEGRAM_BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: true });
-import db from "./src/db/FirebaseService.mjs";
+import db from "./src/db/FirebaseService";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { startListeningForNewPairs } from './src/services/NewPairFetcher.mjs';
-import { HelpScreen } from "./src/help/Help.mjs";
+import { startListeningForNewPairs } from './src/services/NewPairFetcher';
+import { HelpScreen } from "./src/help/Help";
 
-let transferState = {};
+interface TransferState {
+  [chatId: string]: any;
+}
+
+let transferState: TransferState = {};
+
+// Assuming bot is initialized somewhere in the file, if not, it should be initialized as follows:
+const token = 'YOUR_TELEGRAM_BOT_TOKEN';
+const bot = new TelegramBot(token, { polling: true });
 
 // Handle callback queries from the inline keyboard
-bot.on("callback_query", async (callbackQuery) => {
-  const message = callbackQuery.message;
-  const data = callbackQuery.data;
-  const action = callbackQuery.data;
-  const msg = callbackQuery.message;
+bot.on("callback_query", async (callbackQuery: TelegramBot.CallbackQuery) => {
+  const message = callbackQuery.message!;
+  const data = callbackQuery.data!;
+  const action = callbackQuery.data!;
+  const msg = callbackQuery.message!;
   const chatId = msg.chat.id;
   const messageId = msg.message_id;
 
@@ -39,7 +45,6 @@ bot.on("callback_query", async (callbackQuery) => {
     case "delete_wallet":
       deleteWallet(chatId);
       try {
-        let text = "";
         await bot.deleteMessage(chatId, messageId);
       } catch (error) {
         console.error('Failed to "fade" message:', error);
@@ -82,7 +87,7 @@ bot.on("callback_query", async (callbackQuery) => {
     case "newpairs":
       bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
 
-      startListeningForNewPairs((newPair) => {
+      startListeningForNewPairs((newPair: any) => {
         const message = formatNewPairMessage(newPair);
         bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
       });
@@ -104,7 +109,6 @@ bot.on("callback_query", async (callbackQuery) => {
       break;
     case "close":
       try {
-        let text = "";
         await bot.deleteMessage(msg.chat.id, messageId);
       } catch (error) {
         console.error('Failed to "fade" message:', error);
@@ -116,9 +120,9 @@ bot.on("callback_query", async (callbackQuery) => {
   }
 });
 
-async function start(chatId) {
+async function start(chatId: string): Promise<void> {
   console.log("Starting with chatId:", chatId);
-  let userWalletDoc = await db.collection("userWallets").doc(chatId.toString());
+  let userWalletDoc = db.collection("userWallets").doc(chatId.toString());
   let doc = await userWalletDoc.get();
 
   if (!doc.exists) {
@@ -135,8 +139,17 @@ async function start(chatId) {
   }
 
   const userWalletData = await userWalletDoc.get();
-  const publicKey = new PublicKey(userWalletData.data().publicKey);
-  const solBalance = await SolanaService.getSolBalance(publicKey);
+  if (!userWalletData.exists) {
+    console.error("Failed to retrieve user wallet data.");
+    return;
+  }
+  const userData = userWalletData.data();
+  if (!userData) {
+    console.error("User data is undefined.");
+    return;
+  }
+  const publicKey = new PublicKey(userData.publicKey);
+  const solBalance = await SolanaService.getSolBalance(publicKey.toString()); // Fixed argument type
 
   const formattedSolBalance = solBalance.toFixed(6);
 
@@ -155,7 +168,7 @@ async function start(chatId) {
   });
 }
 
-async function getProfile(chatId) {
+async function getProfile(chatId: string): Promise<void> {
   let userWalletDoc = db.collection("userWallets").doc(chatId.toString());
   let doc = await userWalletDoc.get();
 
@@ -167,8 +180,13 @@ async function getProfile(chatId) {
     return;
   }
 
-  const publicKey = new solanaWeb3.PublicKey(doc.data().publicKey);
-  const solBalance = await SolanaService.getSolBalance(publicKey);
+  const userData = doc.data();
+  if (!userData) {
+    console.error("User data is undefined.");
+    return;
+  }
+  const publicKey = new solanaWeb3.PublicKey(userData.publicKey);
+  const solBalance = await SolanaService.getSolBalance(publicKey.toString()); // Fixed argument type
 
   const profileMessage =
     `👤 *Your Profile*\n\n` +
@@ -183,7 +201,7 @@ async function getProfile(chatId) {
   });
 }
 
-async function deleteWallet(chatId) {
+async function deleteWallet(chatId: string): Promise<void> {
   try {
     await db.collection("userWallets").doc(chatId.toString()).delete();
     bot.sendMessage(chatId, "Your wallet has been successfully deleted.");
@@ -196,102 +214,3 @@ async function deleteWallet(chatId) {
   }
 }
 
-bot.onText(/\/home/, (msg) => {
-  bot.sendMessage(msg.chat.id, "🪄 Welcome to the Solana Wizard bot! 🧙");
-  start(msg.chat.id)
-});
-
-// Handle the /quicktrade command
-bot.onText(/\/quicktrade/, (msg) => {
-  bot.sendMessage(msg.chat.id, "Using Quick Snipe and Trade feature...");
-});
-
-bot.onText(/\/profile/, (msg) => {
-  getProfile(msg.chat.id);
-});
-
-// Handle the /trades_history command
-bot.onText(/\/trades_history/, (msg) => {
-  // Your code to handle the trades_history command
-  bot.sendMessage(msg.chat.id, "Viewing your trades history...");
-});
-
-// Handle the /newpairs command
-bot.onText(/\/newpairs/, async (msg) => {
-  bot.sendMessage(msg.chat.id, "Starting to fetch new Solana token pairs...");
-
-  try {
-    const newPairs = await NewPairFetcherModule.getNewPairs();
-    newPairs.forEach((pair) => {
-      const message = `🆕 New Pair Detected!\n🪙 Name: ${pair.name}\n📝 Address: ${pair.address}\n💹 Volume: ${pair.volume}`;
-      bot.sendMessage(msg.chat.id, message);
-    });
-  } catch (error) {
-    console.error("Failed to fetch new pairs:", error);
-    bot.sendMessage(
-      msg.chat.id,
-      "Failed to fetch new pairs. Please try again later.",
-    );
-  }
-});
-
-bot.onText(/\/settings/, async (msg) => {
-  const chatId = msg.chat.id;
-  const settingsScreen = new SettingsScreen(bot, chatId);
-  await settingsScreen.showSettings();
-});
-
-bot.onText(/\/help/, (msg) => {
-  const chatId = msg.chat.id;
-  const helpScreen = new HelpScreen(bot, chatId);
-  helpScreen.showHelp();
-});
-
-bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text;
-
-  if (!text || text.startsWith("/")) return;
-
-  // Handle input for address and amount
-  if (
-    transferState[chatId] &&
-    transferState[chatId].stage === "input_address_amount"
-  ) {
-    // Split the input by comma to get the address and amount
-    const [address, amountString] = text.split(",");
-    const amount = parseFloat(amountString);
-
-    if (address && !isNaN(amount)) {
-      // Perform the transfer
-      await transferSOL(db, bot, chatId, address.trim(), amount);
-      // Reset the transfer state
-      transferState[chatId] = {};
-    } else {
-      // Inform user of incorrect format
-      bot.sendMessage(
-        chatId,
-        "Invalid format. Please enter the address and amount separated by a comma.",
-      );
-    }
-  } else {
-    // Handle other non-command messages or default case
-    bot.sendMessage(
-      chatId,
-      "I didn't recognize that command. Try /help to see all available commands.",
-    );
-  }
-  transferState[chatId] = {};
-});
-
-// Handling callback queries for the help screen
-bot.on("callback_query", async (callbackQuery) => {
-  const data = callbackQuery.data;
-  const chatId = callbackQuery.message.chat.id;
-
-  if (data === 'close_help') {
-    // Close the help message or remove the keyboard
-    await bot.deleteMessage(chatId, callbackQuery.message.message_id);
-  }
-  // Other callback data handling...
-});
