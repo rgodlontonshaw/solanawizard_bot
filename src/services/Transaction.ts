@@ -26,7 +26,7 @@ import {
 } from '@solana/web3.js';
 import { getTokenAccounts, RAYDIUM_LIQUIDITY_PROGRAM_ID_V4, OPENBOOK_PROGRAM_ID, createPoolKeys } from '../liquidity/liquidity';
 import { retrieveEnvVariable } from '../utils/utils';
-import { getMinimalMarketV3, MinimalMarketLayoutV3 } from '../market/market';
+import { getMinimalMarketV3, MinimalMarketLayoutV3 } from '../market/market.ts';
 import pino from 'pino';
 import bs58 from 'bs58';
 import * as fs from 'fs';

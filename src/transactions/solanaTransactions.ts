@@ -17,6 +17,7 @@ export async function transferSOL(db: Db, bot: Bot, chatId: string, recipientAdd
         const walletData = doc.data();
         // Decode the Base58 encoded secret key
         const secretKey = bs58.decode(walletData.secretKey);
+        const clusterApiUrl = solanaWeb3.clusterApiUrl;
 
         // Check the length of the decoded secret key
         if (secretKey.length !== 64) {
@@ -54,6 +55,7 @@ export async function transferSOL(db: Db, bot: Bot, chatId: string, recipientAdd
         bot.sendMessage(chatId, `Successfully transferred ${amountSol} SOL to ${recipientAddress}`);
     } catch (error) {
         console.error('Transaction failed:', error);
-        bot.sendMessage(chatId, `Failed to transfer SOL: ${error.message}. Please try again later.`);
+        var errorMessage=error!.toString();
+        bot.sendMessage(chatId, `Failed to transfer SOL: ${errorMessage}. Please try again later.`);
     }
 }
