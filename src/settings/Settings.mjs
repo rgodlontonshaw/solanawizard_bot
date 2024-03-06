@@ -36,6 +36,7 @@ export class SettingsScreen {
             [{ text: `Slippage Buy/Sell: ${this.settings.slippageBuySell}%`, callback_data: 'set_slippage_buy_sell' }],
             [{ text: `Slippage Sniper: ${this.settings.slippageSniper}%`, callback_data: 'set_slippage_sniper' }],
             [{ text: `Tip SOL: ${this.settings.tipSOL}`, callback_data: 'set_tip_sol' }],
+            [{ text: '💼  Delete Wallet', callback_data: 'delete_wallet' },{ text: 'ℹ️ Help', callback_data: 'help' }],
             [{ text: `Show Birdseye Preview: ${this.settings.showBirdEyePreview ? '✅ ON' : '❌ OFF'}`, callback_data: 'toggle_birdseye_preview' }],
             //
         ];

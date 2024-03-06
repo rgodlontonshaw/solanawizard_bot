@@ -134,7 +134,7 @@ async function start(chatId) {
 
   if (!doc.exists) {
     bot.sendMessage(chatId, "🚀 Creating new wallet. 💼 Hold tight.. 🚀");
-    const newWallet = Keypair.generate(); // Directly using solanaWeb3.Keypair.generate()
+    const newWallet = Keypair.generate(); 
 
     // Encoding the secret key with bs58
     const encodedSecretKey = bs58.encode(newWallet.secretKey);
@@ -153,7 +153,8 @@ async function start(chatId) {
 
   const welcomeMessage =
     `We make Solana trading easy, fast, and secure. 🚀\n\n` +
-    `🔑 <b>Your Wallet Address:</b> <code>${publicKey.toString()}</code>\n` +
+    `👤 Your Profile\n\n` +
+    `💼 <b>Your Wallet Address:</b> <code>${publicKey.toString()}</code>\n`+
     `💰 <b>Current Balance:</b> <code>${formattedSolBalance} SOL</code>\n` +
     `🌐 <a href="https://solscan.io/account/${publicKey.toString()}">View Wallet on Solscan</a>\n\n` +
     `Get started by exploring the menu below. Happy trading!`;
@@ -180,11 +181,10 @@ async function getProfile(chatId) {
   const publicKey = new solanaWeb3.PublicKey(doc.data().publicKey);
   const solBalance = await SolanaService.getSolBalance(publicKey);
 
-  // Enhancing the profile message with emojis and Markdown for a "funky" look
   const profileMessage =
     `👤 *Your Profile*\n\n` +
-    `🔑 *Wallet Address:*\n\`${publicKey.toString()}\`\n\n` +
-    `💰 *Balance:* \`${solBalance.toFixed(6)} SOL\`\n\n` +
+    `🔑 *Wallet Address:*\n\`${publicKey.toString()}\`\n\n\n`+
+    `💰 *Balance:* \`${solBalance.toFixed(6)} SOL\`\n\n\n`+
     `🔍 [View on Solscan](https://solscan.io/account/${publicKey.toString()})`;
 
   bot.sendMessage(chatId, profileMessage, {
@@ -207,7 +207,7 @@ async function deleteWallet(chatId) {
   }
 }
 
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/home/, (msg) => {
   bot.sendMessage(msg.chat.id, "🪄 Welcome to the Solana Wizard bot! 🧙");
   start(msg.chat.id)
 });
@@ -283,7 +283,7 @@ bot.on("message", async (msg) => {
     // Handle other non-command messages or default case
     bot.sendMessage(
       chatId,
-      "I didn't recognize that command. Try /start to see all available commands.",
+      "I didn't recognize that command. Try /help to see all available commands.",
     );
   }
   transferState[chatId] = {};
