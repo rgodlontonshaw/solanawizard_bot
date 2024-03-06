@@ -9,8 +9,8 @@ const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 import db from "./src/db/FirebaseService.mjs";
 import { Keypair, PublicKey } from "@solana/web3.js";
-// Importing the entire module as NewPairFetcherModule to access its exported members
-// import * as NewPairFetcherModule from './src/services/NewPairFetcher.mjs';
+//import * as NewPairFetcherModule from './src/services/NewPairFetcher.mjs';
+import { HelpScreen } from "./src/help/Help.mjs";
 
 let transferState = {};
 
@@ -80,11 +80,9 @@ bot.on("callback_query", async (callbackQuery) => {
       );
       break;
     case "newpairs":
-      const chatId = msg.chat.id;
       bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
 
       try {
-        // Using the NewPairFetcherModule to access the getNewPairs function
         const newPairs = await NewPairFetcherModule.getNewPairs();
         newPairs.forEach((pair) => {
           const message = `🆕 New Pair Detected!\n🪙 Name: ${pair.name}\n📝 Address: ${pair.address}\n💹 Volume: ${pair.volume}`;
@@ -232,15 +230,15 @@ bot.onText(/\/newpairs/, async (msg) => {
   bot.sendMessage(msg.chat.id, "Starting to fetch new Solana token pairs...");
 
   try {
-    const newPairs = await pairFetcher.getNewPairs();
+    const newPairs = await NewPairFetcherModule.getNewPairs();
     newPairs.forEach((pair) => {
       const message = `🆕 New Pair Detected!\n🪙 Name: ${pair.name}\n📝 Address: ${pair.address}\n💹 Volume: ${pair.volume}`;
-      bot.sendMessage(chatId, message);
+      bot.sendMessage(msg.chat.id, message);
     });
   } catch (error) {
     console.error("Failed to fetch new pairs:", error);
     bot.sendMessage(
-      chatId,
+      msg.chat.id,
       "Failed to fetch new pairs. Please try again later.",
     );
   }
@@ -250,6 +248,12 @@ bot.onText(/\/settings/, async (msg) => {
   const chatId = msg.chat.id;
   const settingsScreen = new SettingsScreen(bot, chatId);
   await settingsScreen.showSettings();
+});
+
+bot.onText(/\/help/, (msg) => {
+  const chatId = msg.chat.id;
+  const helpScreen = new HelpScreen(bot, chatId);
+  helpScreen.showHelp();
 });
 
 bot.on("message", async (msg) => {
@@ -289,26 +293,14 @@ bot.on("message", async (msg) => {
   transferState[chatId] = {};
 });
 
-async function displayNewPairInfo(chatId) {
-  // try {
-  //   const newPairs = await pairFetcher.fetchNewPairs();
-  //   if (newPairs.length === 0) {
-  //     await bot.sendMessage(chatId, "No new pairs found.");
-  //     return;
-  //   }
-  //   let messageText = "🚀 New Token Pairs:\n\n";
-  //   newPairs.forEach((pair, index) => {
-  //     messageText += `${index + 1}. ${pair.name} (${pair.symbol})\n`;
-  //     messageText += `Description: ${pair.description}\n`;
-  //     messageText += `Website: ${pair.web || 'N/A'}\n`;
-  //     messageText += `Twitter: ${pair.twitter || 'N/A'}\n`;
-  //     messageText += `Telegram: ${pair.telegram || 'N/A'}\n\n`;
-  //   });
-  //   await bot.sendMessage(chatId, messageText);
-  // } catch (error) {
-  //   console.error("Failed to display new pair info:", error);
-  //   await bot.sendMessage(chatId, "Failed to fetch new pair information. Please try again later.");
-  // }
-}
+// Handling callback queries for the help screen
+bot.on("callback_query", async (callbackQuery) => {
+  const data = callbackQuery.data;
+  const chatId = callbackQuery.message.chat.id;
 
-//const pairFetcher = new NewPairFetcher();
+  if (data === 'close_help') {
+    // Close the help message or remove the keyboard
+    await bot.deleteMessage(chatId, callbackQuery.message.message_id);
+  }
+  // Other callback data handling...
+});
