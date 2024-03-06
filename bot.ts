@@ -1,14 +1,14 @@
 import { SolanaService } from "./src/solana/SolanaService";
 import { KeyboardLayouts } from "./src/ui/KeyboardLayouts";
-import * as solanaWeb3 from "@solana/web3.js";
-import { transferSOL } from "./src/transactions/solanaTransactions";
 import { SettingsScreen } from "./src/settings/Settings.mjs"; // Fixed import path
 import bs58 from "bs58";
-import TelegramBot from "node-telegram-bot-api";
+import TelegramBot, { SendMessageOptions } from "node-telegram-bot-api";
 import db from "./src/db/FirebaseService";
-import { Keypair, PublicKey } from "@solana/web3.js";
 import { startListeningForNewPairs } from './src/services/NewPairFetcher';
 import { HelpScreen } from "./src/help/Help";
+import solanaWeb3, {   Keypair,Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction } from '@solana/web3.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 interface TransferState {
   [chatId: string]: any;
@@ -26,7 +26,7 @@ bot.on("callback_query", async (callbackQuery: TelegramBot.CallbackQuery) => {
   const data = callbackQuery.data!;
   const action = callbackQuery.data!;
   const msg = callbackQuery.message!;
-  const chatId = msg.chat.id;
+  const chatId = msg.chat.id.toString(); // Convert chatId to string
   const messageId = msg.message_id;
 
   // Reset transfer state if starting a new transfer or if any other button is pressed
@@ -71,9 +71,9 @@ bot.on("callback_query", async (callbackQuery: TelegramBot.CallbackQuery) => {
         "Example:\n" +
         "EwR1MRLoXEQR8qTn1AF8ydwujqdMZVs53giNbDCxich,0.001",
         {
-          reply_markup: JSON.stringify({
+          reply_markup: {
             force_reply: true,
-          }),
+          },
         },
       );
 
@@ -88,7 +88,7 @@ bot.on("callback_query", async (callbackQuery: TelegramBot.CallbackQuery) => {
       bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
 
       startListeningForNewPairs((newPair: any) => {
-        const message = formatNewPairMessage(newPair);
+        const message = "New pair detected!"; // Placeholder for actual message formatting logic
         bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
       });
 
@@ -100,29 +100,22 @@ bot.on("callback_query", async (callbackQuery: TelegramBot.CallbackQuery) => {
         "Referral System functionality will be implemented soon.",
       );
       break;
-    case "settings":
-      if (data.startsWith("toggle_") || data.startsWith("set_")) {
-        const settingsScreen = new SettingsScreen(bot, msg.chat.id);
-        await settingsScreen.handleButtonPress(data);
-        return; // Stop further processing since we handled the settings action
-      }
-      break;
     case "close":
       try {
-        await bot.deleteMessage(msg.chat.id, messageId);
+        await bot.deleteMessage(chatId, messageId);
       } catch (error) {
         console.error('Failed to "fade" message:', error);
       }
       break;
     default:
-      bot.sendMessage(msg.chat.id, "Not sure what you want, try again.");
+      bot.sendMessage(chatId, "Not sure what you want, try again.");
       break;
   }
 });
 
 async function start(chatId: string): Promise<void> {
   console.log("Starting with chatId:", chatId);
-  let userWalletDoc = db.collection("userWallets").doc(chatId.toString());
+  let userWalletDoc = db.collection("userWallets").doc(chatId);
   let doc = await userWalletDoc.get();
 
   if (!doc.exists) {
@@ -164,12 +157,12 @@ async function start(chatId: string): Promise<void> {
   bot.sendMessage(chatId, welcomeMessage, {
     parse_mode: "HTML",
     disable_web_page_preview: true,
-    ...KeyboardLayouts.getStartMenuKeyboard(),
-  });
+    reply_markup: KeyboardLayouts.getStartMenuKeyboard(),
+  } as unknown as SendMessageOptions);
 }
 
 async function getProfile(chatId: string): Promise<void> {
-  let userWalletDoc = db.collection("userWallets").doc(chatId.toString());
+  let userWalletDoc = db.collection("userWallets").doc(chatId);
   let doc = await userWalletDoc.get();
 
   if (!doc.exists) {
@@ -197,13 +190,13 @@ async function getProfile(chatId: string): Promise<void> {
   bot.sendMessage(chatId, profileMessage, {
     parse_mode: "Markdown",
     disable_web_page_preview: true, // Disable URL preview
-    ...KeyboardLayouts.getProfileMenuKeyboard(),
-  });
+    reply_markup: KeyboardLayouts.getProfileMenuKeyboard(),
+  } as unknown as SendMessageOptions);
 }
 
 async function deleteWallet(chatId: string): Promise<void> {
   try {
-    await db.collection("userWallets").doc(chatId.toString()).delete();
+    await db.collection("userWallets").doc(chatId).delete();
     bot.sendMessage(chatId, "Your wallet has been successfully deleted.");
   } catch (error) {
     console.error("Error deleting wallet:", error);
@@ -214,3 +207,59 @@ async function deleteWallet(chatId: string): Promise<void> {
   }
 }
 
+async function transferSOL(chatId: string, recipientAddress: string, amountSol: number): Promise<void> {
+  try {
+      if (!chatId) throw new Error('Chat ID is missing or invalid.');
+      if (!recipientAddress) throw new Error('Recipient address is missing or invalid.');
+      if (typeof amountSol !== 'number' || isNaN(amountSol) || amountSol <= 0) throw new Error('Amount must be a positive number.');
+
+      // Retrieve the document for the user
+      let doc = await db.collection('userWallets').doc(chatId.toString()).get();
+      if (!doc.exists) throw new Error('Wallet not found for the user.');
+      const walletData = doc.data();
+      if (!walletData || !walletData.secretKey) throw new Error('Wallet data is missing or incomplete.');
+
+      // Decode the Base58 encoded secret key
+      const secretKey = bs58.decode(walletData.secretKey);
+      const clusterApiUrl = solanaWeb3.clusterApiUrl;
+
+      // Check the length of the decoded secret key
+      if (secretKey.length !== 64) {
+          throw new Error("Decoded secret key must be 64 bytes long");
+      }
+
+      // Create a Keypair from the secret key
+      const senderKeypair = Keypair.fromSecretKey(secretKey);
+
+      // Setup the connection to the Solana cluster
+      const connection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
+      
+      // Calculate the lamports to transfer
+      const lamports = amountSol * LAMPORTS_PER_SOL;
+
+      // Check if the sender account has enough balance to cover the transaction
+      const senderBalance = await connection.getBalance(senderKeypair.publicKey);
+      if (senderBalance < lamports) {
+          throw new Error(`Insufficient funds: Your balance is ${senderBalance / LAMPORTS_PER_SOL} SOL, but the transaction requires at least ${amountSol} SOL.`);
+      }
+
+      // Prepare the transaction
+      let transaction = new Transaction().add(
+          SystemProgram.transfer({
+              fromPubkey: senderKeypair.publicKey,
+              toPubkey: new PublicKey(recipientAddress),
+              lamports,
+          })
+      );
+
+      // Sign and send the transaction
+      var signature = await sendAndConfirmTransaction(connection, transaction, [senderKeypair]);
+
+      console.log('Transaction successful:', signature);
+      bot.sendMessage(chatId, `Successfully transferred ${amountSol} SOL to ${recipientAddress}`);
+  } catch (error) {
+      console.error('Transaction failed:', error);
+      var errorMessage=error!.toString();
+      bot.sendMessage(chatId, `Failed to transfer SOL: ${errorMessage}. Please try again later.`);
+  }
+}

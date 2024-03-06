@@ -7,7 +7,7 @@
     "module": "nodenext", 
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "nodeNext",
+    "moduleResolution": "Node16",
     "allowJs": true,
     "declaration": true,
     "resolveJsonModule": true
