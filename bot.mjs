@@ -9,10 +9,24 @@ const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 import db from "./src/db/FirebaseService.mjs";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { startListeningForNewPairs } from './src/services/NewPairFetcher.mjs';
+import { fetchNewPairs } from "./src/services/NewPairFetcher.mjs";
+
 import { HelpScreen } from "./src/help/Help.mjs";
+import fetch from "node-fetch";
 
 let transferState = {};
+
+// Function to periodically check for new pairs and notify the user
+function startListeningForNewPairs(chatId) {
+  // const checkInterval = 60000; 
+  // setInterval(async () => {
+  //   const newPairs = await fetchNewPairs();
+  //   newPairs.forEach(pair => {
+  //     const message = `🆕 New Pair Detected!\n🪙 Name: ${pair.name}\n📝 Address: ${pair.address}`;
+  //     bot.sendMessage(chatId, message);
+  //   });
+  // }, checkInterval);
+}
 
 // Handle callback queries from the inline keyboard
 bot.on("callback_query", async (callbackQuery) => {
@@ -81,12 +95,7 @@ bot.on("callback_query", async (callbackQuery) => {
       break;
     case "newpairs":
       bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
-
-      startListeningForNewPairs((newPair) => {
-        const message = formatNewPairMessage(newPair);
-        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-      });
-
+      startListeningForNewPairs(chatId);
       break;
     case "referral_system":
       // Implement Referral System functionality
@@ -96,11 +105,12 @@ bot.on("callback_query", async (callbackQuery) => {
       );
       break;
     case "settings":
-      if (data.startsWith("toggle_") || data.startsWith("set_")) {
-        const settingsScreen = new SettingsScreen(bot, msg.chat.id);
-        await settingsScreen.handleButtonPress(data);
-        return; // Stop further processing since we handled the settings action
-      }
+      bot.sendMessage(
+        chatId,
+        "Settings functionality will be implemented soon.",
+      );
+      const settingsScreen = new SettingsScreen(bot, chatId);
+      await settingsScreen.showSettings();
       break;
     case "close":
       try {
@@ -218,21 +228,9 @@ bot.onText(/\/trades_history/, (msg) => {
 
 // Handle the /newpairs command
 bot.onText(/\/newpairs/, async (msg) => {
-  bot.sendMessage(msg.chat.id, "Starting to fetch new Solana token pairs...");
-
-  try {
-    const newPairs = await NewPairFetcherModule.getNewPairs();
-    newPairs.forEach((pair) => {
-      const message = `🆕 New Pair Detected!\n🪙 Name: ${pair.name}\n📝 Address: ${pair.address}\n💹 Volume: ${pair.volume}`;
-      bot.sendMessage(msg.chat.id, message);
-    });
-  } catch (error) {
-    console.error("Failed to fetch new pairs:", error);
-    bot.sendMessage(
-      msg.chat.id,
-      "Failed to fetch new pairs. Please try again later.",
-    );
-  }
+  const chatId = msg.chat.id;
+  bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
+  startListeningForNewPairs(chatId);
 });
 
 bot.onText(/\/settings/, async (msg) => {

@@ -1,118 +1,79 @@
-import pkg from '@raydium-io/raydium-sdk';
-const { LIQUIDITY_STATE_LAYOUT_V4 } = pkg;
-import * as solanaWeb3 from '@solana/web3.js';
-import { RAYDIUM_LIQUIDITY_PROGRAM_ID_V4 } from '../liquidity/liquidity.mjs';
-import { retrieveEnvVariable } from '../utils/utils.mjs';
-import pino from 'pino';
-import { Metaplex } from '@metaplex-foundation/js';
-import Metadata from "@metaplex-foundation/mpl-token-metadata";
-import fetch from 'node-fetch';
+import { Connection, PublicKey } from "@solana/web3.js";
 
-const transport = pino.transport({
-targets: [{
-  level: 'trace',
-  target: 'pino-pretty',
-  options: {},
-}],
+const RAYDIUM_PUBLIC_KEY = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8";
+
+const SESSION_HASH = 'QNDEMO' + Math.ceil(Math.random() * 1e9); // Random unique identifier for your session
+let credits = 0;
+
+const raydium = new PublicKey(RAYDIUM_PUBLIC_KEY);
+// Replace HTTP_URL & WSS_URL with QuickNode HTTPS and WSS Solana Mainnet endpoint
+const connection = new Connection(`https://api.mainnet-beta.solana.com`, {
+    wsEndpoint: `wss://api.mainnet-beta.solana.com`,
+    httpHeaders: {"x-session-hash": SESSION_HASH}
 });
 
-export const logger = pino(
-{
-  redact: ['poolKeys'],
-  serializers: {
-    error: pino.stdSerializers.err,
-  },
-  base: undefined,
-},
-transport,
-);
+// Monitor logs
+async function main(connection, programAddress) {
+    console.log("Monitoring logs for program:", programAddress.toString());
+    connection.onLogs(
+        programAddress,
+        ({ logs, err, signature }) => {
+            if (err) return;
 
-const network = 'mainnet-beta';
-const RPC_ENDPOINT = retrieveEnvVariable('RPC_ENDPOINT', logger);
-const RPC_WEBSOCKET_ENDPOINT = retrieveEnvVariable('RPC_WEBSOCKET_ENDPOINT', logger);
+            if (logs && logs.some(log => log.includes("initialize2"))) {
+                console.log("Signature for 'initialize2':", signature);
+                fetchRaydiumAccounts(signature, connection);
+            }
+        },
+        "finalized"
+    );
+}
 
-const solanaConnection = new solanaWeb3.Connection(RPC_ENDPOINT, {
-wsEndpoint: RPC_WEBSOCKET_ENDPOINT,
-});
-const metaplex = Metaplex.make(solanaConnection);
+// Parse transaction and filter data
+async function fetchRaydiumAccounts(txId, connection) {
+    const tx = await connection.getParsedTransaction(
+        txId,
+        {
+            maxSupportedTransactionVersion: 0,
+            commitment: 'confirmed'
+        });
+    
+    credits += 100;
+    
+    const accounts = tx?.transaction.message.instructions.find(ix => ix.programId.toBase58() === RAYDIUM_PUBLIC_KEY).accounts;
 
-const commitment = solanaWeb3.Commitment;
-
-let existingLiquidityPools = new Set();
-
-// At the end of the file, export the runListener function
-export const startListeningForNewPairs = (onNewPair) => {
-  runListener(onNewPair);
-};
-
-// Modify the existing runListener function
-const runListener = async (onNewPair) => {
-const runTimestamp = Math.floor(new Date().getTime() / 1000);
-const raydiumSubscriptionId = solanaConnection.onProgramAccountChange(
-  RAYDIUM_LIQUIDITY_PROGRAM_ID_V4,
-  async (updatedAccountInfo) => {
-    const key = updatedAccountInfo.accountId.toString();
-    const poolState = LIQUIDITY_STATE_LAYOUT_V4.decode(updatedAccountInfo.accountInfo.data);
-  
-    if (parseInt(poolState.poolOpenTime.toString()) > runTimestamp && !existingLiquidityPools.has(key)) {
-      existingLiquidityPools.add(key);
-      const metadataPda = metaplex.nfts().pdas().metadata({ mint: poolState.baseMint });
-      const tokenDetails = await Metadata.fromAccountAddress(solanaConnection, metadataPda);
-      logger.info(tokenDetails.data.uri);
-      fetchTokenMetadata(tokenDetails.data.uri).then(metadata => {
-        if (onNewPair) {
-          onNewPair(metadata); // Invoke the callback with the metadata
-        }
-      });
+    if (!accounts) {
+        console.log("No accounts found in the transaction.");
+        return;
     }
-  },
-  commitment,
-);
 
-logger.info(`Listening for Raydium pool changes: ${raydiumSubscriptionId}`);
-};
+    const tokenAIndex = 8;
+    const tokenBIndex = 9;
 
-async function fetchTokenMetadata(uri) {
-try {
-  const response = await fetch(uri);
-  if (!response.ok) {
-    throw new Error(`Error fetching metadata: ${response.statusText}`);
-  }
-  const metadata = await response.json();
-  const tokenData = {
-    name: metadata.name,
-    symbol: metadata.symbol,
-    description: metadata.description,
-    image: metadata.image,
-    web: extractURL(metadata.description, 'web'),
-    twitter: extractURL(metadata.description, 'twitter'),
-    telegram: extractURL(metadata.description, 'telegram'),
-  };
-  console.log(tokenData);
-  return metadata;
-} catch (error) {
-  console.error(`Failed to fetch token metadata: ${error}`);
-}
+    const tokenAAccount = accounts[tokenAIndex];
+    const tokenBAccount = accounts[tokenBIndex];
+
+    const displayData = [
+        { "Token": "A", "Account Public Key": tokenAAccount.toBase58() },
+        { "Token": "B", "Account Public Key": tokenBAccount.toBase58() }
+    ];
+    console.log("New LP Found");
+    console.log(generateExplorerUrl(txId));
+    console.table(displayData);
+    console.log("Total QuickNode Credits Used in this session:", credits);
 }
 
-function extractURL(description, type) {
-let regex;
-
-switch (type) {
-  case 'telegram':
-    regex = /(?:TG|Telegram|TG✅)\s*[:✅]*\s*(https?:\/\/t\.me\/\S+)/i;
-    break;
-  case 'twitter':
-    regex = /(?:Twitter|X|Twitter\/X|X🚀)\s*[:🚀]*\s*(https?:\/\/(twitter\.com|x\.com)\/\S+)/i;
-    break;
-  case 'web':
-    regex = /(?:Web|Website|Website🌐)\s*[:🌐]*\s*(https?:\/\/\S+)/i;
-    break;
+function generateExplorerUrl(txId) {
+    return `https://solscan.io/tx/${txId}`;
 }
 
-if (!regex) return undefined;
+export { main as startListeningForNewPairs };
 
-const match = regex.exec(description);
-return match ? match[1] : undefined;
+export async function fetchNewPairs() {
+  // Your logic to fetch new pairs goes here
+  // For demonstration, returning a mock array of new pairs
+  return [
+      { name: "Mock Token 1", address: "MockAddress1" },
+      { name: "Mock Token 2", address: "MockAddress2" }
+  ];
 }
-runListener();
