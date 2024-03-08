@@ -12,12 +12,13 @@ const { Keypair, PublicKey } = solanaWeb3;
 const fetchNewPairs = require("./src/services/NewPairFetcher.js");
 const HelpScreen = require("./src/help/Help.js");
 const fetch = require("node-fetch");
-const { newPairEmitter } = require("./src/services/NewPairFetcher.js");
+const { newPairEmitter, runListener } = require("./src/services/NewPairFetcher.js");
 
 
 let transferState = {};
 
 function startListeningForNewPairs(chatId) {
+  runListener();
   newPairEmitter.on('newPair', (tokenData) => {
       const message = `🆕 New Pair Detected!\n🪙 Name: ${tokenData.name}\n📝 Symbol: ${tokenData.symbol}\n🌐 Website: ${tokenData.web}\n🐦 Twitter: ${tokenData.twitter}\n📱 Telegram: ${tokenData.telegram}`;
       bot.sendMessage(chatId, message);
