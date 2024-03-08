@@ -1,31 +1,27 @@
-import { SolanaService } from "./src/solana/SolanaService.mjs";
-import { KeyboardLayouts } from "./src/ui/KeyboardLayouts.mjs";
-import * as solanaWeb3 from "@solana/web3.js";
-import { transferSOL } from "./src/transactions/solanaTransactions.mjs";
-import { SettingsScreen } from "./src/settings/Settings.mjs";
-import bs58 from "bs58";
-import TelegramBot from "node-telegram-bot-api";
+const SolanaService = require("./src/solana/SolanaService.js");
+const KeyboardLayouts = require("./src/ui/KeyboardLayouts.js");
+const solanaWeb3 = require("@solana/web3.js");
+const transferSOL = require("./src/transactions/solanaTransactions.js");
+const SettingsScreen = require("./src/settings/Settings.js");
+const bs58 = require("bs58");
+const TelegramBot = require("node-telegram-bot-api");
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
-import db from "./src/db/FirebaseService.mjs";
-import { Keypair, PublicKey } from "@solana/web3.js";
-import { fetchNewPairs } from "./src/services/NewPairFetcher.mjs";
+const db = require("./src/db/FirebaseService.js");
+const { Keypair, PublicKey } = solanaWeb3;
+const fetchNewPairs = require("./src/services/NewPairFetcher.js");
+const HelpScreen = require("./src/help/Help.js");
+const fetch = require("node-fetch");
+const { newPairEmitter } = require("./src/services/NewPairFetcher.js");
 
-import { HelpScreen } from "./src/help/Help.mjs";
-import fetch from "node-fetch";
 
 let transferState = {};
 
-// Function to periodically check for new pairs and notify the user
 function startListeningForNewPairs(chatId) {
-  // const checkInterval = 60000; 
-  // setInterval(async () => {
-  //   const newPairs = await fetchNewPairs();
-  //   newPairs.forEach(pair => {
-  //     const message = `🆕 New Pair Detected!\n🪙 Name: ${pair.name}\n📝 Address: ${pair.address}`;
-  //     bot.sendMessage(chatId, message);
-  //   });
-  // }, checkInterval);
+  newPairEmitter.on('newPair', (tokenData) => {
+      const message = `🆕 New Pair Detected!\n🪙 Name: ${tokenData.name}\n📝 Symbol: ${tokenData.symbol}\n🌐 Website: ${tokenData.web}\n🐦 Twitter: ${tokenData.twitter}\n📱 Telegram: ${tokenData.telegram}`;
+      bot.sendMessage(chatId, message);
+  });
 }
 
 // Handle callback queries from the inline keyboard

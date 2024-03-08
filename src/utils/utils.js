@@ -1,8 +1,8 @@
-import pino from 'pino';
-import dotenv from 'dotenv';
+const pino = require('pino');
+const dotenv = require('dotenv');
 dotenv.config();
 
-export const retrieveEnvVariable = (variableName, logger) => {
+const retrieveEnvVariable = (variableName, logger) => {
   const variable = process.env[variableName] || '';
   if (!variable) {
     logger.error(`${variableName} is not set`);
@@ -10,3 +10,5 @@ export const retrieveEnvVariable = (variableName, logger) => {
   }
   return variable;
 }
+
+module.exports = { retrieveEnvVariable };

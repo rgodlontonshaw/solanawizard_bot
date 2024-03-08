@@ -1,7 +1,7 @@
-import solanaWeb3 from '@solana/web3.js';
+const solanaWeb3 = require('@solana/web3.js');
 const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'));
 
-export class SolanaService {
+class SolanaService {
   static async createSolanaWallet() {
     const newPair = solanaWeb3.Keypair.generate();
     return newPair;
@@ -12,3 +12,5 @@ export class SolanaService {
     return balance / solanaWeb3.LAMPORTS_PER_SOL;
   }
 }
+
+module.exports = SolanaService;

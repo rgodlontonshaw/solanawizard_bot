@@ -1,4 +1,4 @@
-export class HelpScreen {
+class HelpScreen {
   constructor(bot, chatId) {
     this.bot = bot;
     this.chatId = chatId;
@@ -33,3 +33,5 @@ export class HelpScreen {
     await this.bot.sendMessage(this.chatId, helpMessage, options);
   }
 }
+
+module.exports = HelpScreen;

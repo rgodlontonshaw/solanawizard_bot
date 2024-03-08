@@ -1,4 +1,4 @@
-export class SettingsScreen {
+class SettingsScreen {
     constructor(bot, chatId) {
         this.bot = bot;
         this.chatId = chatId;
@@ -22,7 +22,6 @@ export class SettingsScreen {
             })
         };
   
-        // Save the message ID of the settings message
         const sentMessage = await this.bot.sendMessage(this.chatId, "Settings:", options);
         this.settingsMessageId = sentMessage.message_id;
     }
@@ -38,12 +37,10 @@ export class SettingsScreen {
             [{ text: `Tip SOL: ${this.settings.tipSOL}`, callback_data: 'set_tip_sol' }],
             [{ text: '💼  Delete Wallet', callback_data: 'delete_wallet' },{ text: 'ℹ️ Help', callback_data: 'help' }],
             [{ text: `Show Birdseye Preview: ${this.settings.showBirdEyePreview ? '✅ ON' : '❌ OFF'}`, callback_data: 'toggle_birdseye_preview' }],
-            //
         ];
     }
   
     async handleButtonPress(action) {
-        // Toggling settings based on the action
         switch (action) {
             case 'toggle_auto_buy':
                 this.settings.autoBuy = !this.settings.autoBuy;
@@ -54,15 +51,29 @@ export class SettingsScreen {
             case 'toggle_anti_mev':
                 this.settings.antiMEV = !this.settings.antiMEV;
                 break;
-            // ... other toggles
+            case 'toggle_wsol_snipe':
+                this.settings.wsolSnipe = !this.settings.wsolSnipe;
+                break;
+            case 'toggle_birdseye_preview':
+                this.settings.showBirdEyePreview = !this.settings.showBirdEyePreview;
+                break;
+            case 'set_slippage_buy_sell':
+                // Assume logic to set slippage for buy/sell is implemented elsewhere
+                break;
+            case 'set_slippage_sniper':
+                // Assume logic to set sniper slippage is implemented elsewhere
+                break;
+            case 'set_tip_sol':
+                // Assume logic to set tip SOL is implemented elsewhere
+                break;
+            // Additional cases for other settings as needed
         }
 
-        // Call a method to update the inline keyboard
         await this.updateSettingsKeyboard();
     }
 
     async updateSettingsKeyboard() {
-        if (this.settingsMessageId === null) {
+        if (!this.settingsMessageId) {
             console.error('Settings message ID not set. Cannot update the message.');
             return;
         }
@@ -75,7 +86,8 @@ export class SettingsScreen {
             })
         };
 
-        // Edit the message with the new keyboard
         await this.bot.editMessageReplyMarkup(options.reply_markup, { chat_id: options.chat_id, message_id: options.message_id });
     }
 }
+
+module.exports = SettingsScreen;
