@@ -21,7 +21,7 @@ async function transferSOL(db, bot, chatId, recipientAddress, amountSol) {
 
         const senderKeypair = solanaWeb3.Keypair.fromSecretKey(secretKey);
 
-        const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+        const connection = new solanaWeb3.Connection(`https://api.mainnet-beta.solana.com`, 'confirmed');
 
         const lamports = amountSol * solanaWeb3.LAMPORTS_PER_SOL;
 

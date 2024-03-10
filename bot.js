@@ -1,7 +1,7 @@
 const SolanaService = require("./src/solana/SolanaService.js");
 const KeyboardLayouts = require("./src/ui/KeyboardLayouts.js");
 const solanaWeb3 = require("@solana/web3.js");
-const transferSOL = require("./src/transactions/solanaTransactions.js");
+const { transferSOL } = require("./src/transactions/solanaTransactions.js");
 const SettingsScreen = require("./src/settings/Settings.js");
 const bs58 = require("bs58");
 const TelegramBot = require("node-telegram-bot-api");

@@ -92,6 +92,7 @@ async function fetchTokenMetadata(uri) {
 
 function extractURL(description, type) {
     let regex;
+    let iconWithX = '❌';
 
     switch (type) {
         case 'telegram':
@@ -105,10 +106,10 @@ function extractURL(description, type) {
             break;
     }
 
-    if (!regex) return undefined;
+    if (!regex) return iconWithX;
 
     const match = RegExp(regex).exec(description);
-    return match ? match[1] : undefined;
+    return match ? match[1] : iconWithX;
 }
 
 
