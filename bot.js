@@ -15,6 +15,7 @@ const fetch = require("node-fetch");
 const { newPairEmitter, runListener } = require("./src/services/NewPairFetcher.js");
 const { Metadata } = require('@metaplex-foundation/mpl-token-metadata');
 const connection = new Connection('https://api.mainnet-beta.solana.com');
+const METAPLEX_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
 
 let transferState = {};
@@ -316,21 +317,19 @@ async function handleSell(chatId) {
 async function getMetadataPDA(mintAddress) {
   try {
     const mint = new PublicKey(mintAddress);
-    const [publicKey] = await PublicKey.findProgramAddress(
-      [Buffer.from('metadata'), Metadata.PROGRAM_ID.toBuffer(), mint.toBuffer()],
-      Metadata.PROGRAM_ID
+    const [pda] = await PublicKey.findProgramAddress(
+      [Buffer.from('metadata'), METAPLEX_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+      METAPLEX_PROGRAM_ID
     );
-    return publicKey;
+    return pda;
   } catch (error) {
     console.error('Error in getMetadataPDA:', error);
     throw new Error('Invalid mint address');
   }
 }
 
-async function fetchTokenMetadata(connection, mintAddress) {
+async function fetchTokenMetadata(mintAddress) {
   try {
-    if (!mintAddress) throw new Error('Mint address is required');
-
     const pda = await getMetadataPDA(mintAddress);
     const metadata = await Metadata.fromAccountAddress(connection, pda);
     return metadata.data;
@@ -339,6 +338,7 @@ async function fetchTokenMetadata(connection, mintAddress) {
     throw error;
   }
 }
+
 
 async function fetchTokenDetails(tokenAddress) {
   try {
