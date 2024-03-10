@@ -8,11 +8,13 @@ const TelegramBot = require("node-telegram-bot-api");
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 const db = require("./src/db/FirebaseService.js");
-const { Keypair, PublicKey } = solanaWeb3;
+const { Connection,Keypair, PublicKey } = solanaWeb3;
 const fetchNewPairs = require("./src/services/NewPairFetcher.js");
 const HelpScreen = require("./src/help/Help.js");
 const fetch = require("node-fetch");
 const { newPairEmitter, runListener } = require("./src/services/NewPairFetcher.js");
+const { Metadata } = require('@metaplex-foundation/mpl-token-metadata');
+const connection = new Connection('https://api.mainnet-beta.solana.com');
 
 
 let transferState = {};
@@ -252,7 +254,7 @@ bot.onText(/\/help/, (msg) => {
 
 bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
   const chatId = msg.chat.id;
-  const tokenAddress = match[1]; // The token address captured by the regex
+  let tokenAddress = match[1]; // The token address captured by the regex
   const tokenDetailsMessage = await fetchTokenDetails(tokenAddress);
   bot.sendMessage(chatId, tokenDetailsMessage);
 });
@@ -285,13 +287,7 @@ bot.on("message", async (msg) => {
         "🧙 Invalid format. Please enter the address and amount separated by a comma.",
       );
     }
-  } else {
-    // Handle other non-command messages or default case
-    bot.sendMessage(
-      chatId,
-      "🧙 I didn't recognize that command. Try /help to see all available commands.",
-    );
-  }
+  } 
   transferState[chatId] = {};
 });
 
@@ -317,45 +313,69 @@ async function handleSell(chatId) {
   // Example: bot.sendMessage(chatId, "Selling...");
 }
 
-async function fetchTokenDetails(tokenAddress) {
+async function getMetadataPDA(mintAddress) {
   try {
-    // Validate the token address (you may have a specific service for this)
-    const isValid = await validateTokenAddress(tokenAddress);
-    if (!isValid) {
-      throw new Error('Invalid token address');
-    }
-
-    // Proceed with fetching token details
-    const response = await fetch(`https://api.example.com/token-details/${tokenAddress}`);
-    if (!response.ok) {
-      throw new Error('Token not found');
-    }
-    const tokenDetails = await response.json();
-
-    // Construct the message with token details
-    const message = `Token Details Found:\nName: ${tokenDetails.name}\nSymbol: ${tokenDetails.symbol}\n...`;
-    return message;
+    const mint = new PublicKey(mintAddress);
+    const [publicKey] = await PublicKey.findProgramAddress(
+      [Buffer.from('metadata'), Metadata.PROGRAM_ID.toBuffer(), mint.toBuffer()],
+      Metadata.PROGRAM_ID
+    );
+    return publicKey;
   } catch (error) {
-    console.error('Error:', error);
-    return "The pool you’re looking for may not be available yet.";
+    console.error('Error in getMetadataPDA:', error);
+    throw new Error('Invalid mint address');
   }
 }
 
-async function validateTokenAddress(address) {
-
-  // return /[A-HJ-NP-Za-km-z1-9]{44}/.test(address);
+async function fetchTokenMetadata(connection, mintAddress) {
   try {
-    // Check if the address is a valid Solana public key
-    const publicKey = new solanaWeb3.PublicKey(address);
-    
-    // You would need an instance of a Connection to the Solana cluster to check if the account exists
-    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+    if (!mintAddress) throw new Error('Mint address is required');
 
-    // Fetch account info to see if the address exists on the blockchain
+    const pda = await getMetadataPDA(mintAddress);
+    const metadata = await Metadata.fromAccountAddress(connection, pda);
+    return metadata.data;
+  } catch (error) {
+    console.error('Error in fetchTokenMetadata:', error);
+    throw error;
+  }
+}
+
+async function fetchTokenDetails(tokenAddress) {
+  try {
+    const isValid = await validateTokenAddress(tokenAddress);
+    if (!isValid) {
+      return 'Invalid token address';
+    }
+
+    const metadata = await fetchTokenMetadata(connection, tokenAddress);
+
+    const message = [
+      `Token Details Found:`,
+      `Name: ${metadata.name}`,
+      `Symbol: ${metadata.symbol}`,
+      `URI: ${metadata.uri}`,
+      `Seller fee basis points: ${metadata.sellerFeeBasisPoints}`,
+      `Creators: ${metadata.creators ? metadata.creators.map(creator => `${creator.address} (${creator.share}%)`).join(', ') : 'None'}`,
+    ].join('\n');
+
+    return message;
+  } catch (error) {
+    console.error('Error:', error);
+    if (error.message === 'Invalid token address') {
+      return "The token address provided is invalid. Please check and try again.";
+    }
+    return "The token's metadata could not be fetched. The token may not exist or the address may be invalid.";
+  }
+}
+
+
+async function validateTokenAddress(address) {
+  try {
+    const publicKey = new solanaWeb3.PublicKey(address);
+    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
     const accountInfo = await connection.getAccountInfo(publicKey);
     return accountInfo !== null;
   } catch (error) {
-    // If an error occurs, it's likely because the address was not a valid public key
     return false;
   }
 }
