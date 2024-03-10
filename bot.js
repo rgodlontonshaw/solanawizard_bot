@@ -47,6 +47,14 @@ bot.on("callback_query", async (callbackQuery) => {
 
   // Define the logic for each callback data
   switch (data) {
+    case 'buy':
+      // Call your function to handle buying
+      await handleBuy(chatId);
+      break;
+  case 'sell':
+      // Call your function to handle selling
+      await handleSell(chatId);
+      break;
     case "delete_wallet":
       deleteWallet(chatId);
       try {
@@ -169,7 +177,7 @@ async function getProfile(chatId) {
   if (!doc.exists) {
     bot.sendMessage(
       chatId,
-      "You don't have a wallet yet. 🛑 Use /start to create one.",
+      "🧙 You don't have a wallet yet. 🛑 Use /start to create one.",
     );
     return;
   }
@@ -198,19 +206,19 @@ async function deleteWallet(chatId) {
     console.error("Error deleting wallet:", error);
     bot.sendMessage(
       chatId,
-      "An error occurred while trying to delete your wallet. Please try again later.",
+      " 🪄 An error occurred while trying to delete your wallet. Please try again later.",
     );
   }
 }
 
 bot.onText(/\/home/, (msg) => {
-  bot.sendMessage(msg.chat.id, "🪄 Welcome to the Solana Wizard bot! 🧙");
+  bot.sendMessage(msg.chat.id, "🧙 Welcome to the Solana Wizard bot! 🪄 ");
   start(msg.chat.id)
 });
 
 // Handle the /quicktrade command
 bot.onText(/\/quicktrade/, (msg) => {
-  bot.sendMessage(msg.chat.id, "Using Quick Snipe and Trade feature...");
+  bot.sendMessage(msg.chat.id, "🧙 Using Quick Snipe and Trade feature...");
 });
 
 bot.onText(/\/profile/, (msg) => {
@@ -226,7 +234,7 @@ bot.onText(/\/trades_history/, (msg) => {
 // Handle the /newpairs command
 bot.onText(/\/newpairs/, async (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
+  bot.sendMessage(chatId, "🧙 Starting to fetch new Solana token pairs...");
   startListeningForNewPairs(chatId);
 });
 
@@ -241,6 +249,14 @@ bot.onText(/\/help/, (msg) => {
   const helpScreen = new HelpScreen(bot, chatId);
   helpScreen.showHelp();
 });
+
+bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const tokenAddress = match[1]; // The token address captured by the regex
+  const tokenDetailsMessage = await fetchTokenDetails(tokenAddress);
+  bot.sendMessage(chatId, tokenDetailsMessage);
+});
+
 
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
@@ -266,14 +282,14 @@ bot.on("message", async (msg) => {
       // Inform user of incorrect format
       bot.sendMessage(
         chatId,
-        "Invalid format. Please enter the address and amount separated by a comma.",
+        "🧙 Invalid format. Please enter the address and amount separated by a comma.",
       );
     }
   } else {
     // Handle other non-command messages or default case
     bot.sendMessage(
       chatId,
-      "I didn't recognize that command. Try /help to see all available commands.",
+      "🧙 I didn't recognize that command. Try /help to see all available commands.",
     );
   }
   transferState[chatId] = {};
@@ -290,3 +306,56 @@ bot.on("callback_query", async (callbackQuery) => {
   }
   // Other callback data handling...
 });
+
+async function handleBuy(chatId) {
+  bot.sendMessage(chatId, "🧙 Paste a token contract address to buy a token." + String.fromCodePoint(0x21C4));
+}
+
+async function handleSell(chatId) {
+  // Implement your selling logic here
+  console.log(`Handling sell for chatId: ${chatId}`);
+  // Example: bot.sendMessage(chatId, "Selling...");
+}
+
+async function fetchTokenDetails(tokenAddress) {
+  try {
+    // Validate the token address (you may have a specific service for this)
+    const isValid = await validateTokenAddress(tokenAddress);
+    if (!isValid) {
+      throw new Error('Invalid token address');
+    }
+
+    // Proceed with fetching token details
+    const response = await fetch(`https://api.example.com/token-details/${tokenAddress}`);
+    if (!response.ok) {
+      throw new Error('Token not found');
+    }
+    const tokenDetails = await response.json();
+
+    // Construct the message with token details
+    const message = `Token Details Found:\nName: ${tokenDetails.name}\nSymbol: ${tokenDetails.symbol}\n...`;
+    return message;
+  } catch (error) {
+    console.error('Error:', error);
+    return "The pool you’re looking for may not be available yet.";
+  }
+}
+
+async function validateTokenAddress(address) {
+
+  // return /[A-HJ-NP-Za-km-z1-9]{44}/.test(address);
+  try {
+    // Check if the address is a valid Solana public key
+    const publicKey = new solanaWeb3.PublicKey(address);
+    
+    // You would need an instance of a Connection to the Solana cluster to check if the account exists
+    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+
+    // Fetch account info to see if the address exists on the blockchain
+    const accountInfo = await connection.getAccountInfo(publicKey);
+    return accountInfo !== null;
+  } catch (error) {
+    // If an error occurs, it's likely because the address was not a valid public key
+    return false;
+  }
+}
