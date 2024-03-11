@@ -70,11 +70,11 @@ bot.on("callback_query", async (callbackQuery) => {
     case "quick_trade_sniper":
       bot.sendMessage(
         chatId,
-        "Quick Snipe and Trade functionality will be implemented soon.",
+        "🧙 Quick Snipe and Trade functionality will be implemented soon.",
       );
       break;
     case "profile":
-      bot.sendMessage(chatId, "Viewing your profile...");
+      bot.sendMessage(chatId, "🧙 Viewing your profile...");
       getProfile(chatId);
 
       break;
@@ -83,7 +83,7 @@ bot.on("callback_query", async (callbackQuery) => {
 
       bot.sendMessage(
         chatId,
-        "Enter Addresses with Amounts\n" +
+        "🧙 Enter Addresses with Amounts\n" +
         "The address and amount are separated by commas.\n\n" +
         "Example:\n" +
         "EwR1MRLoXEQR8qTn1AF8ydwujqdMZVs53giNbDCxich,0.001",
@@ -98,24 +98,24 @@ bot.on("callback_query", async (callbackQuery) => {
     case "trades_history":
       bot.sendMessage(
         chatId,
-        "Trades History functionality will be implemented soon.",
+        "🧙 Trades History functionality will be implemented soon.",
       );
       break;
     case "newpairs":
-      bot.sendMessage(chatId, "Starting to fetch new Solana token pairs...");
+      bot.sendMessage(chatId, "🧙Starting to fetch new Solana token pairs...");
       startListeningForNewPairs(chatId);
       break;
     case "referral_system":
       // Implement Referral System functionality
       bot.sendMessage(
         chatId,
-        "Referral System functionality will be implemented soon.",
+        "🧙 Referral System functionality will be implemented soon.",
       );
       break;
     case "settings":
       bot.sendMessage(
         chatId,
-        "Settings functionality will be implemented soon.",
+        "🧙 Settings functionality will be implemented soon.",
       );
       const settingsScreen = new SettingsScreen(bot, chatId);
       await settingsScreen.showSettings();
@@ -129,7 +129,7 @@ bot.on("callback_query", async (callbackQuery) => {
       }
       break;
     default:
-      bot.sendMessage(msg.chat.id, "Not sure what you want, try again.");
+      bot.sendMessage(msg.chat.id, "🧙 Not sure what you want, try again.");
       break;
   }
 });
