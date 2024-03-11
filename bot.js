@@ -255,7 +255,7 @@ bot.onText(/\/help/, (msg) => {
 
 bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
   const chatId = msg.chat.id;
-  let tokenAddress = match[1]; // The token address captured by the regex
+  let tokenAddress = String(match[1]); 
   const tokenDetailsMessage = await fetchTokenDetails(tokenAddress);
   bot.sendMessage(chatId, tokenDetailsMessage);
 });
@@ -316,15 +316,31 @@ async function handleSell(chatId) {
 
 async function getMetadataPDA(mintAddress) {
   try {
+    // Validate the mintAddress before proceeding
+    if (typeof mintAddress !== 'string' || mintAddress.length !== 44) {
+      throw new Error(`Invalid mint address format. Type: ${typeof mintAddress}, Length: ${mintAddress.length}`);
+    }
     const mint = new PublicKey(mintAddress);
-    const [pda] = await PublicKey.findProgramAddress(
-      [Buffer.from('metadata'), METAPLEX_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-      METAPLEX_PROGRAM_ID
-    );
+    // Check if the mint address is on curve to avoid assertion failure
+    if (!PublicKey.isOnCurve(mint.toBuffer())) {
+      throw new Error('Mint address is not on curve');
+    }
+    const pda = await new Promise((resolve) => {
+      const [pdaAddress] = PublicKey.findProgramAddressSync(
+        [Buffer.from('metadata'),  METAPLEX_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+        METAPLEX_PROGRAM_ID
+      );
+      resolve(pdaAddress);
+    });
     return pda;
   } catch (error) {
     console.error('Error in getMetadataPDA:', error);
-    throw new Error('Invalid mint address');
+    // Include more details in the thrown error if the initial validation fails
+    if (error.message.includes('Invalid mint address format')) {
+      throw new Error(`Invalid mint address: Type: ${typeof mintAddress}, Length: ${mintAddress ? mintAddress.length : 'N/A'}, Value: ${mintAddress}`);
+    } else {
+      throw new Error('Invalid mint address');
+    }
   }
 }
 
@@ -339,15 +355,18 @@ async function fetchTokenMetadata(mintAddress) {
   }
 }
 
-
 async function fetchTokenDetails(tokenAddress) {
   try {
+
     const isValid = await validateTokenAddress(tokenAddress);
     if (!isValid) {
       return 'Invalid token address';
     }
 
-    const metadata = await fetchTokenMetadata(connection, tokenAddress);
+    console.log("fetchTokenDetails tokenAddress:", tokenAddress, "Type:", typeof tokenAddress);
+
+
+    const metadata = await fetchTokenMetadata(tokenAddress);
 
     const message = [
       `Token Details Found:`,
