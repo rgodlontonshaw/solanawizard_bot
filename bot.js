@@ -257,7 +257,19 @@ bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
   const chatId = msg.chat.id;
   let tokenAddress = String(match[1]); 
   const tokenDetailsMessage = await fetchTokenDetails(tokenAddress);
-  bot.sendMessage(chatId, tokenDetailsMessage);
+  const opts = {
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🔄 Swap', callback_data: 'swap' }, { text: '🪄 Limit', callback_data: 'limit' }, { text: '🪄 DCA', callback_data: 'dca' }],
+        [{ text: ' 🪄 Buy 0.5 SOL', callback_data: '0.5_sol' }, { text: '1 SOL', callback_data: '1_sol' }, { text: '🪄 Buy 3 SOL', callback_data: '3_sol' }],
+        [{ text: '🪄 Buy 5 SOL', callback_data: '5_sol' }, { text: '10 SOL', callback_data: '10_sol' }, { text: '🪄 Buy X SOL', callback_data: 'custom_sol' }],
+        [{ text: '🪄 15% Slippage', callback_data: '15_slippage' }, { text: '🪄 X Slippage', callback_data: 'custom_slippage' }],
+        [{ text: '🪄 BUY', callback_data: 'buy' }],
+      ]
+    }
+  };
+  bot.sendMessage(chatId, tokenDetailsMessage,opts);
 });
 
 
@@ -364,7 +376,6 @@ async function fetchTokenDetails(tokenAddress) {
     }
 
     console.log("fetchTokenDetails tokenAddress:", tokenAddress, "Type:", typeof tokenAddress);
-
 
     const metadata = await fetchTokenMetadata(tokenAddress);
 
