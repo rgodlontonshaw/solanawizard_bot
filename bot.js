@@ -8,7 +8,7 @@ const TelegramBot = require("node-telegram-bot-api");
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 const db = require("./src/db/FirebaseService.js");
-const { Connection,Keypair, PublicKey } = solanaWeb3;
+const { Connection, Keypair, PublicKey } = solanaWeb3;
 const fetchNewPairs = require("./src/services/NewPairFetcher.js");
 const HelpScreen = require("./src/help/Help.js");
 const fetch = require("node-fetch");
@@ -17,14 +17,15 @@ const { Metadata } = require('@metaplex-foundation/mpl-token-metadata');
 const connection = new Connection('https://api.mainnet-beta.solana.com');
 const METAPLEX_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
-
+let tokenAddress = "";
 let transferState = {};
+let chatStates = {};
 
 function startListeningForNewPairs(chatId) {
   runListener();
   newPairEmitter.on('newPair', (tokenData) => {
-      const message = `🆕 New Pair Detected!\n🪙 Name: ${tokenData.name}\n📝 Symbol: ${tokenData.symbol}\n🌐 Website: ${tokenData.web}\n🐦 Twitter: ${tokenData.twitter}\n📱 Telegram: ${tokenData.telegram}`;
-      bot.sendMessage(chatId, message);
+    const message = `🆕 New Pair Detected!\n🪙 Name: ${tokenData.name}\n📝 Symbol: ${tokenData.symbol}\n🌐 Website: ${tokenData.web}\n🐦 Twitter: ${tokenData.twitter}\n📱 Telegram: ${tokenData.telegram}`;
+    bot.sendMessage(chatId, message);
   });
 }
 
@@ -54,7 +55,7 @@ bot.on("callback_query", async (callbackQuery) => {
       // Call your function to handle buying
       await handleBuy(chatId);
       break;
-  case 'sell':
+    case 'sell':
       // Call your function to handle selling
       await handleSell(chatId);
       break;
@@ -127,6 +128,14 @@ bot.on("callback_query", async (callbackQuery) => {
       } catch (error) {
         console.error('Failed to "fade" message:', error);
       }
+    case "custom_sol":
+      chatStates[chatId] = { state: 'input_amount' };
+      // Prompt the user to enter an amount
+      bot.sendMessage(chatId, "Please enter the amount of SOL you want to buy:", {
+        reply_markup: JSON.stringify({
+          force_reply: true,
+        }),
+      },);
       break;
     default:
       bot.sendMessage(msg.chat.id, "🧙 Not sure what you want, try again.");
@@ -141,7 +150,7 @@ async function start(chatId) {
 
   if (!doc.exists) {
     bot.sendMessage(chatId, "🚀 Creating new wallet. 💼 Hold tight.. 🚀");
-    const newWallet = Keypair.generate(); 
+    const newWallet = Keypair.generate();
 
     // Encoding the secret key with bs58
     const encodedSecretKey = bs58.encode(newWallet.secretKey);
@@ -161,7 +170,7 @@ async function start(chatId) {
   const welcomeMessage =
     `We make Solana trading easy, fast, and secure. 🚀\n\n` +
     `👤 Your Profile\n\n` +
-    `💼 <b>Your Wallet Address:</b> <code>${publicKey.toString()}</code>\n`+
+    `💼 <b>Your Wallet Address:</b> <code>${publicKey.toString()}</code>\n` +
     `💰 <b>Current Balance:</b> <code>${formattedSolBalance} SOL</code>\n` +
     `🌐 <a href="https://solscan.io/account/${publicKey.toString()}">View Wallet on Solscan</a>\n\n` +
     `Get started by exploring the menu below. Happy trading!`;
@@ -190,8 +199,8 @@ async function getProfile(chatId) {
 
   const profileMessage =
     `👤 *Your Profile*\n\n` +
-    `🔑 *Wallet Address:*\n\`${publicKey.toString()}\`\n\n\n`+
-    `💰 *Balance:* \`${solBalance.toFixed(6)} SOL\`\n\n\n`+
+    `🔑 *Wallet Address:*\n\`${publicKey.toString()}\`\n\n\n` +
+    `💰 *Balance:* \`${solBalance.toFixed(6)} SOL\`\n\n\n` +
     `🔍 [View on Solscan](https://solscan.io/account/${publicKey.toString()})`;
 
   bot.sendMessage(chatId, profileMessage, {
@@ -215,7 +224,7 @@ async function deleteWallet(chatId) {
 }
 
 bot.onText(/\/home/, (msg) => {
-  bot.sendMessage(msg.chat.id, "🧙 Welcome to the Solana Wizard bot! 🪄 ");
+  bot.sendMessage(msg.chat.id, "🧙 Welcome to the Sol Wizard Bot! 🪄 ");
   start(msg.chat.id)
 });
 
@@ -255,7 +264,7 @@ bot.onText(/\/help/, (msg) => {
 
 bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
   const chatId = msg.chat.id;
-  let tokenAddress = String(match[1]); 
+  tokenAddress = String(match[1]);
   const tokenDetailsMessage = await fetchTokenDetails(tokenAddress);
   const opts = {
     parse_mode: 'HTML',
@@ -269,7 +278,7 @@ bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
       ]
     }
   };
-  bot.sendMessage(chatId, tokenDetailsMessage,opts);
+  bot.sendMessage(chatId, tokenDetailsMessage, opts);
 });
 
 
@@ -300,8 +309,25 @@ bot.on("message", async (msg) => {
         "🧙 Invalid format. Please enter the address and amount separated by a comma.",
       );
     }
-  } 
+  }
   transferState[chatId] = {};
+
+  if (chatStates[chatId] && chatStates[chatId].state === 'input_amount') {
+    // Process the input as the amount
+    const amount = parseFloat(text);
+    if (isNaN(amount) || amount <= 0) {
+      bot.sendMessage(chatId, "Invalid amount. Please enter a positive number.");
+    } else {
+      // Here, you would call your function to handle the amount, e.g., to initiate a token purchase
+      console.log(`Amount entered by user: ${amount} SOL`);
+      // Reset the state
+      chatStates[chatId] = {};
+      // Confirm the action to the user
+      bot.sendMessage(chatId, `⚡ 🟣 You've entered ${amount} SOL. Proceeding with the purchase...`);
+      // Call your function to handle the purchase
+      await purchaseToken(chatId, amount);
+    }
+  }
 });
 
 // Handling callback queries for the help screen
@@ -313,7 +339,6 @@ bot.on("callback_query", async (callbackQuery) => {
     // Close the help message or remove the keyboard
     await bot.deleteMessage(chatId, callbackQuery.message.message_id);
   }
-  // Other callback data handling...
 });
 
 async function handleBuy(chatId) {
@@ -339,7 +364,7 @@ async function getMetadataPDA(mintAddress) {
     }
     const pda = await new Promise((resolve) => {
       const [pdaAddress] = PublicKey.findProgramAddressSync(
-        [Buffer.from('metadata'),  METAPLEX_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+        [Buffer.from('metadata'), METAPLEX_PROGRAM_ID.toBuffer(), mint.toBuffer()],
         METAPLEX_PROGRAM_ID
       );
       resolve(pdaAddress);
@@ -408,4 +433,77 @@ async function validateTokenAddress(address) {
   } catch (error) {
     return false;
   }
+}
+
+
+async function purchaseToken(chatId, amount) {
+
+  try {
+    const userWalletDoc = await db.collection("userWallets").doc(chatId.toString()).get();
+
+    if (!userWalletDoc.exists) {
+      bot.sendMessage(chatId, "❌ Buy failed: Wallet not found.");
+      return;
+    }
+
+    const userWalletData = userWalletDoc.data();
+    const publicKey = new PublicKey(userWalletData.publicKey);
+    const solBalance = await SolanaService.getSolBalance(publicKey);
+    const solBalanceInSOL = solBalance / solanaWeb3.LAMPORTS_PER_SOL;
+
+    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+
+    // Get recent blockhash
+    const recentBlockhash = await connection.getRecentBlockhash();
+    const { feeCalculator } = recentBlockhash;
+
+    if (!recentBlockhash || !feeCalculator) {
+      console.error("Failed to get recent blockhash!");
+      bot.sendMessage(chatId, "❌ Buy failed: Error fetching network data.");
+      return;
+    }
+
+    const txFeeInSOL = feeCalculator.lamportsPerSignature * solanaWeb3.TRANSACTION_FEE_PAYER_COUNT / solanaWeb3.LAMPORTS_PER_SOL;
+
+    if (amount + txFeeInSOL > solBalanceInSOL) {
+      bot.sendMessage(chatId, `❌ Buy failed: Insufficient balance to cover purchase and transaction fee | 💳 Wallet: ${publicKey.toString()}`);
+      return;
+    }
+
+    const walletPublicKey = new solanaWeb3.PublicKey(userWalletData.publicKey);
+    const secretKeyUint8Array = new Uint8Array(Object.values(JSON.parse(userWalletData.secretKey)));
+    const wallet = solanaWeb3.Keypair.fromSecretKey(secretKeyUint8Array);
+
+    const transactionInstruction = createPurchaseInstruction(wallet.publicKey, tokenAddress, amount);
+
+    let transaction = new solanaWeb3.Transaction().add(transactionInstruction);
+
+    let signedTransaction = await solanaWeb3.sendAndConfirmTransaction(
+      connection,
+      transaction,
+      [userWalletData],
+    );
+
+    // bot.sendMessage(`Buying token ${tokenAddress} for chatId: ${chatId}`);
+    // Simulate buying process
+    bot.sendMessage(chatId, `✅ Successfully bought token: ${tokenAddress}`);
+
+    return signedTransaction;
+  } catch (error) {
+    console.error(`Failed to buy token ${tokenAddress} for chatId: ${chatId}`, error);
+    bot.sendMessage(chatId, `❌ Buy failed: ${error.message}`);
+  }
+}
+
+
+function createPurchaseInstruction(walletPublicKey, tokenAddress, amount) {
+  const lamports = amount * solanaWeb3.LAMPORTS_PER_SOL;
+
+  const instruction = solanaWeb3.SystemProgram.transfer({
+    fromPubkey: new solanaWeb3.PublicKey(walletPublicKey),
+    toPubkey: new solanaWeb3.PublicKey(tokenAddress),
+    lamports,
+  });
+
+  return instruction;
 }
