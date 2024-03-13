@@ -439,6 +439,13 @@ async function validateTokenAddress(address) {
 async function purchaseToken(chatId, amount) {
 
   try {
+
+    if (!tokenAddress || !isValidPublicKey(tokenAddress)) {
+      console.error(`Invalid token address: "${tokenAddress}"`);
+      bot.sendMessage(chatId, "❌ Buy failed: Invalid token address.");
+      return;
+    }
+
     const userWalletDoc = await db.collection("userWallets").doc(chatId.toString()).get();
 
     if (!userWalletDoc.exists) {
@@ -471,8 +478,12 @@ async function purchaseToken(chatId, amount) {
     }
 
     const walletPublicKey = new solanaWeb3.PublicKey(userWalletData.publicKey);
-    const secretKeyUint8Array = new Uint8Array(Object.values(JSON.parse(userWalletData.secretKey)));
-    const wallet = solanaWeb3.Keypair.fromSecretKey(secretKeyUint8Array);
+    let doc = await db.collection('userWallets').doc(chatId.toString()).get();
+    if (!doc.exists) throw new Error('Wallet not found for the user.');
+    const walletData = doc.data();
+
+    const secretKey = bs58.decode(walletData.secretKey);
+    const wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
 
     const transactionInstruction = createPurchaseInstruction(wallet.publicKey, tokenAddress, amount);
 
@@ -481,20 +492,17 @@ async function purchaseToken(chatId, amount) {
     let signedTransaction = await solanaWeb3.sendAndConfirmTransaction(
       connection,
       transaction,
-      [userWalletData],
+      [wallet],
     );
 
-    // bot.sendMessage(`Buying token ${tokenAddress} for chatId: ${chatId}`);
-    // Simulate buying process
+    console.log(`Successfully bought token ${tokenAddress} for chatId: ${chatId}`);
     bot.sendMessage(chatId, `✅ Successfully bought token: ${tokenAddress}`);
-
     return signedTransaction;
   } catch (error) {
     console.error(`Failed to buy token ${tokenAddress} for chatId: ${chatId}`, error);
     bot.sendMessage(chatId, `❌ Buy failed: ${error.message}`);
   }
 }
-
 
 function createPurchaseInstruction(walletPublicKey, tokenAddress, amount) {
   const lamports = amount * solanaWeb3.LAMPORTS_PER_SOL;
@@ -506,4 +514,13 @@ function createPurchaseInstruction(walletPublicKey, tokenAddress, amount) {
   });
 
   return instruction;
+}
+
+function isValidPublicKey(key) {
+  try {
+    new PublicKey(key);
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
