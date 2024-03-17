@@ -23,6 +23,19 @@ let tokenAddress = "";
 let transferState = {};
 let chatStates = {};
 
+let accountStates = {};
+
+function setAccountState(chatId, key, value) {
+    if (!accountStates[chatId]) {
+      accountStates[chatId] = {};
+    }
+    accountStates[chatId][key] = value;
+}
+
+function getAccountState(chatId, key) {
+    return accountStates[chatId] ? accountStates[chatId][key] : null;
+}
+
 function startListeningForNewPairs(chatId) {
   runListener();
   newPairEmitter.on('newPair', (tokenData) => {
@@ -272,6 +285,8 @@ bot.onText(/\/help/, (msg) => {
 bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
   const chatId = msg.chat.id;
   tokenAddress = String(match[1]);
+  setAccountState(chatId, 'tokenAddress', tokenAddress);
+
   const tokenDetailsMessage = await fetchTokenDetails(tokenAddress);
   const opts = {
     parse_mode: 'HTML',
@@ -281,7 +296,7 @@ bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
         [{ text: ' 🪄 Buy 0.5 SOL', callback_data: '0.5_sol' }, { text: '1 SOL', callback_data: '1_sol' }, { text: '🪄 Buy 3 SOL', callback_data: '3_sol' }],
         [{ text: '🪄 Buy 5 SOL', callback_data: '5_sol' }, { text: '10 SOL', callback_data: '10_sol' }, { text: '🪄 Buy X SOL', callback_data: 'custom_sol' }],
         [{ text: '🪄 15% Slippage', callback_data: '15_slippage' }, { text: '🪄 X Slippage', callback_data: 'custom_slippage' }],
-        [{ text: '🪄 BUY', callback_data: 'buy' }],
+        [{ text: '❌ Close', callback_data: 'close' }]
       ]
     }
   };
@@ -343,7 +358,6 @@ bot.on("callback_query", async (callbackQuery) => {
   const chatId = callbackQuery.message.chat.id;
 
   if (data === 'close_help') {
-    // Close the help message or remove the keyboard
     await bot.deleteMessage(chatId, callbackQuery.message.message_id);
   }
 });
@@ -412,7 +426,7 @@ async function fetchTokenDetails(tokenAddress) {
     const metadata = await fetchTokenMetadata(tokenAddress);
 
     const message = [
-      `${metadata.name}\n${metadata.symbol}\n <code>${tokenAddress.toString()}</code>\n`,
+      `${metadata.name}\n${metadata.symbol}\n<code>${tokenAddress.toString()}</code>\n`,
       `URI: ${metadata.uri}`,
       `Seller fee basis points: ${metadata.sellerFeeBasisPoints}`,
       `Creators: ${metadata.creators ? metadata.creators.map(creator => `${creator.address} (${creator.share}%)`).join(', ') : 'None'}`,
@@ -578,32 +592,24 @@ function isValidPublicKey(key) {
 }
 
 async function updateUserTokenHoldings(chatId, tokenAddress, amount) {
-  // Get the document reference for the user's token holdings
   const userTokenHoldingsDoc = db.collection("userTokenHoldings").doc(chatId.toString());
 
-  // Get the current holdings from the database
   const doc = await userTokenHoldingsDoc.get();
   let holdings = {};
 
   if (doc.exists) {
-      // If the document exists, get the current holdings
       holdings = doc.data();
   }
 
-  // Update the holdings with the new amount, adding to any existing amount
-  // If the token already exists in their holdings, add the new amount to the existing amount
   const currentAmount = holdings[tokenAddress] || 0;
   holdings[tokenAddress] = currentAmount + amount;
 
-  // Set the updated holdings back to the database
   await userTokenHoldingsDoc.set(holdings);
 
-  // Inform the user
   bot.sendMessage(chatId, `✅ Holdings updated: ${amount} of ${tokenAddress} added to your wallet.`);
 }
 
 async function sendTokenHoldings(chatId) {
-  // Retrieve the user's token holdings from the database
   let userTokenHoldings = await db.collection("userTokenHoldings").doc(chatId.toString()).get();
 
   if (!userTokenHoldings.exists) {
@@ -612,18 +618,13 @@ async function sendTokenHoldings(chatId) {
   }
 
   const holdings = userTokenHoldings.data();
-  let message = "Your Token Holdings:\n";
+  let message = "Your holdings:\n";
 
-  // Assuming holdings is an object where the key is the tokenAddress and the value is the amount
   for (const [tokenAddress, amount] of Object.entries(holdings)) {
-      // Fetch the current token details such as name, value, etc.
-      const tokenDetails = await fetchTokenDetails(tokenAddress); // This needs to be defined to fetch details from an API or your database
-
-      // Append each token's details to the message
+      const tokenDetails = await fetchTokenDetails(tokenAddress); 
       message += `Token: ${tokenDetails.name}, Amount: ${amount}, Value: $${tokenDetails.currentValue}\n`;
   }
 
-  // Send the message with the token holdings to the user
   bot.sendMessage(chatId, message);
 }
 
