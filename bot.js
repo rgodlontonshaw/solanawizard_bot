@@ -16,6 +16,10 @@ const { newPairEmitter, runListener } = require("./src/services/NewPairFetcher.j
 const { Metadata } = require('@metaplex-foundation/mpl-token-metadata');
 const connection = new Connection('https://api.mainnet-beta.solana.com');
 const METAPLEX_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+const telegramBotInteraction = require('./src/services/TelegramBot.js');
+const userWalletManagement = require('./src/managers/walletmanager.js');
+// const transactionManagement = new TransactionManagement(solanaService, connection);
+// const userStateManagement = new UserStateManagement();
 const TRANSACTION_FEE_PAYER_COUNT = 1;
 
 let solBalanceMain = '';
