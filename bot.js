@@ -8,19 +8,21 @@ const TelegramBot = require("node-telegram-bot-api");
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 const db = require("./src/db/FirebaseService.js");
-const { Connection, Keypair, PublicKey } = solanaWeb3;
+const { Connection, Keypair, Transaction, sendAndConfirmTransaction, PublicKey, VersionedTransaction } = solanaWeb3;
 const fetchNewPairs = require("./src/services/NewPairFetcher.js");
 const HelpScreen = require("./src/help/Help.js");
 const fetch = require("node-fetch");
 const { newPairEmitter, runListener } = require("./src/services/NewPairFetcher.js");
 const { Metadata } = require('@metaplex-foundation/mpl-token-metadata');
 const connection = new Connection('https://api.mainnet-beta.solana.com');
-const METAPLEX_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 const telegramBotInteraction = require('./src/services/TelegramBot.js');
 const userWalletManagement = require('./src/managers/walletmanager.js');
-// const transactionManagement = new TransactionManagement(solanaService, connection);
-// const userStateManagement = new UserStateManagement();
+const fetchCross = require('cross-fetch');
+const { Wallet } = require('@project-serum/anchor');
 const TRANSACTION_FEE_PAYER_COUNT = 1;
+const { VersionedMessage } = require("@solana/web3.js");
+const { TOKEN_PROGRAM_ID } = require("@project-serum/anchor/dist/cjs/utils/token.js");
+const METAPLEX_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
 let solBalanceMain = '';
 let tokenAddress = "";
@@ -30,14 +32,14 @@ let chatStates = {};
 let accountStates = {};
 
 function setAccountState(chatId, key, value) {
-    if (!accountStates[chatId]) {
-      accountStates[chatId] = {};
-    }
-    accountStates[chatId][key] = value;
+  if (!accountStates[chatId]) {
+    accountStates[chatId] = {};
+  }
+  accountStates[chatId][key] = value;
 }
 
 function getAccountState(chatId, key) {
-    return accountStates[chatId] ? accountStates[chatId][key] : null;
+  return accountStates[chatId] ? accountStates[chatId][key] : null;
 }
 
 function startListeningForNewPairs(chatId) {
@@ -57,9 +59,17 @@ bot.on("callback_query", async (callbackQuery) => {
   const chatId = msg.chat.id;
   const messageId = msg.message_id;
 
-  // Reset transfer state if starting a new transfer or if any other button is pressed
-  if (data !== "input_amount" && data !== "input_address") {
-    transferState[chatId] = {};
+  // Clear chatStates[chatId] when "Close" is tapped or for other actions as needed
+  if (data === "close") {
+    delete chatStates[chatId];
+    try {
+      await bot.deleteMessage(chatId, messageId);
+    } catch (error) {
+      console.error('Failed to "fade" message:', error);
+    }
+    return; // Stop further processing
+  } else {
+    delete chatStates[chatId];
   }
 
   if (data.startsWith("toggle_") || data.startsWith("set_")) {
@@ -314,7 +324,6 @@ bot.on("message", async (msg) => {
 
   if (!text || text.startsWith("/")) return;
 
-  // Handle input for address and amount
   if (
     transferState[chatId] &&
     transferState[chatId].stage === "input_address_amount"
@@ -356,24 +365,25 @@ bot.on("message", async (msg) => {
   }
 });
 
-// Handling callback queries for the help screen
-bot.on("callback_query", async (callbackQuery) => {
-  const data = callbackQuery.data;
-  const chatId = callbackQuery.message.chat.id;
-
-  if (data === 'close_help') {
-    await bot.deleteMessage(chatId, callbackQuery.message.message_id);
-  }
-});
 
 async function handleBuy(chatId) {
   bot.sendMessage(chatId, "🧙 Paste a token contract address to buy a token. " + String.fromCodePoint(0x21C4));
 }
 
 async function handleSell(chatId) {
-  // Implement your selling logic here
+  const sellOptions = {
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🪄 Sell 0.5 SOL', callback_data: 'sell_0.5_sol' }, { text: '1 SOL', callback_data: 'sell_1_sol' }, { text: '🪄 Sell 3 SOL', callback_data: 'sell_3_sol' }],
+        [{ text: '🪄 Sell 5 SOL', callback_data: 'sell_5_sol' }, { text: '10 SOL', callback_data: 'sell_10_sol' }, { text: '🪄 Sell X SOL', callback_data: 'sell_custom_sol' }],
+        [{ text: '🪄 15% Slippage', callback_data: 'sell_15_slippage' }, { text: '🪄 X Slippage', callback_data: 'sell_custom_slippage' }],
+        [{ text: '❌ Close', callback_data: 'close' }]
+      ]
+    }
+  };
+  bot.sendMessage(chatId, "Select sell options:", sellOptions);
   console.log(`Handling sell for chatId: ${chatId}`);
-  // Example: bot.sendMessage(chatId, "Selling...");
 }
 
 async function getMetadataPDA(mintAddress) {
@@ -470,106 +480,84 @@ async function purchaseToken(chatId, amount) {
     }
 
     const userWalletDoc = await db.collection("userWallets").doc(chatId.toString()).get();
+    const userWalletData = userWalletDoc.data();
 
     if (!userWalletDoc.exists) {
       bot.sendMessage(chatId, "❌ Buy failed: Wallet not found.");
       return;
     }
 
-
     const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
-    const userWalletData = userWalletDoc.data();
-    console.log(`Public Key: ${userWalletData.publicKey}`);
-    const publicKey = new PublicKey(userWalletData.publicKey);
-    console.log(`Converted Public Key: ${publicKey.toString()}`);
-    const solBalance = await SolanaService.getSolBalance(publicKey);
-    console.log(`SOL Balance in Lamports: ${solBalance}`);
-    const formattedSolBalance = solBalance.toFixed(6);
-    console.log(`SOL Balance: ${formattedSolBalance}`);
-    // Get recent blockhash
-    const recentBlockhash = await connection.getRecentBlockhash();
-    const { feeCalculator } = recentBlockhash;
-    if (!recentBlockhash || !feeCalculator) {
-      console.error("Failed to get recent blockhash!");
-      bot.sendMessage(chatId, "❌ Buy failed: Error fetching network data.");
-      return;
-    }
+   
 
-    // Include fees in the transaction
     const feePercentage = 0.005; // 0.5%
     const purchaseAmountInLamports = amount * solanaWeb3.LAMPORTS_PER_SOL;
+    const recentBlockhash = await connection.getRecentBlockhash();
+    const { feeCalculator } = recentBlockhash;
     const feeAmountInLamports = Math.ceil(purchaseAmountInLamports * feePercentage); // Calculate the fee, always round up to not undercharge
     const txFeeInSOL = (feeCalculator.lamportsPerSignature + feeAmountInLamports) * TRANSACTION_FEE_PAYER_COUNT / solanaWeb3.LAMPORTS_PER_SOL;
-    console.log(`feeCalculator.lamportsPerSignature: ${feeCalculator.lamportsPerSignature}`);
-    console.log(`purchaseAmountInLamports: ${purchaseAmountInLamports}`);
-    console.log(`feeAmountInLamports: ${feeAmountInLamports}`);
-    console.log(`TRANSACTION_FEE_PAYER_COUNT: ${TRANSACTION_FEE_PAYER_COUNT}`);
-
-    // Ensure the user has enough SOL to cover the purchase amount plus transaction fee
-    // Log the individual values
-    console.log(`Amount to purchase: ${amount} SOL`);
-    console.log(`Transaction Fee: ${txFeeInSOL} SOL`);
-
-    const solBalanceInSOL = formattedSolBalance;//solBalance / solanaWeb3.LAMPORTS_PER_SOL;
-    console.log(`User's SOL Balance: ${solBalanceInSOL} SOL`);
-    console.log(`Is amount + transaction fee greater than balance? ${amount + txFeeInSOL > solBalanceInSOL}`);
-    console.log(`solBalanceInSOL: ${solBalanceInSOL}`);
-
-    if (amount + txFeeInSOL > solBalanceInSOL) {
-      bot.sendMessage(chatId, `❌ Buy failed: Insufficient balance to cover purchase and transaction fee | 💳 Wallet: ${publicKey.toString()}`);
-      return;
-    }
-
-    if (amount + txFeeInSOL > solBalanceInSOL) {
-      const additionalSOLRequired = (amount + txFeeInSOL) - solBalanceInSOL;
-      bot.sendMessage(chatId, `❌ Buy failed: Insufficient balance. You need an additional ${additionalSOLRequired.toFixed(9)} SOL to cover the purchase and transaction fee. | 💳 Wallet: ${publicKey.toString()}`);
-      return;
-    }
-    
-
+    console.log(`Transaction fee per signature: ${feeCalculator.lamportsPerSignature}`);
+    console.log(`Amount for purchase in Lamports: ${purchaseAmountInLamports}`);
+    console.log(`Calculated fee amount in Lamports: ${feeAmountInLamports}`);
+    const totalAmount = purchaseAmountInLamports + feeAmountInLamports;
     const secretKey = bs58.decode(userWalletData.secretKey);
     const wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
+    const quoteResponse = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${tokenAddress}&amount=${totalAmount}&slippageBps=50`).then(response => response.json());
+    const requestBody = {
+      quoteResponse, 
+      userPublicKey: wallet.publicKey.toString(),
+      wrapAndUnwrapSol: true,
+      inputMint: 'So11111111111111111111111111111111111111112', 
+      outputMint: tokenAddress, // The target token's mint address
+    };
 
-    // Create purchase instruction
-    const purchaseTransactionInstruction = createPurchaseInstruction(
-      wallet.publicKey, 
-      tokenAddress, 
-      purchaseAmountInLamports - feeAmountInLamports
-    );
-
-    // Specify the fee receiver address
-    const feeReceiverAddress = new solanaWeb3.PublicKey('33LP6HA3AG5vyaB3NoUaPXd1DQWfTsRXLYUoM1fJXA9n');
-    //process.env.FEE_WALLET_ADDRESS);
-
-    // Create fee transaction instruction
-    const feeTransactionInstruction = solanaWeb3.SystemProgram.transfer({
-      fromPubkey: wallet.publicKey,
-      toPubkey: feeReceiverAddress,
-      lamports: feeAmountInLamports,
+    // Step 1: Perform the swap request and handle the response
+    const response = await fetch('https://quote-api.jup.ag/v6/swap', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody),
     });
 
-    // Add both instructions to the transaction
-    let transaction = new solanaWeb3.Transaction()
-      .add(purchaseTransactionInstruction)
-      .add(feeTransactionInstruction);
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-    // Sign and send the transaction
-    let signedTransaction = await solanaWeb3.sendAndConfirmTransaction(
-      connection,
-      transaction,
-      [wallet],
-      { commitment: 'singleGossip', preflightCommitment: 'singleGossip' }
-    );
+    const { swapTransaction } = await response.json();
 
-    console.log(`Successfully bought token ${tokenAddress} for chatId: ${chatId}`);
-    bot.sendMessage(chatId, `✅ Successfully bought token: ${tokenAddress}`);
-    // Update the user's token holdings after a successful purchase
-    await updateUserTokenHoldings(chatId, tokenAddress, amount - (feeAmountInLamports / solanaWeb3.LAMPORTS_PER_SOL));
+    if (!swapTransaction) {
+      throw new Error('swapTransaction is undefined');
+    }
+ 
+    const swapTransactionBuf = Buffer.from(swapTransaction, 'base64');
+    var transaction = VersionedTransaction.deserialize(swapTransactionBuf);
+    console.log(transaction);
+    transaction.sign([wallet]);
+  
+    try {
+      // Serialize the transaction
+      const serializedTransaction = transaction.serialize();
+  
+      // Send the serialized transaction
+      const txid = await connection.sendRawTransaction(serializedTransaction, {
+          skipPreflight: true,
+          preflightCommitment: 'confirmed',
+      });
+  
+      console.log(`Transaction successful with ID: ${txid}`);
+      console.log(`Swap successful: https://solscan.io/tx/${txid}`);
+      bot.sendMessage(chatId, `✅ Purchase successful: [View Transaction](https://solscan.io/tx/${txid})`, { parse_mode: 'Markdown' });
+   
+    } catch (error) {
+        console.error('Error sending transaction:', error);
+    }
 
-    return signedTransaction;
-  } catch (error) {
-    console.error(`Failed to buy token ${tokenAddress} for chatId: ${chatId}`, error);
-    bot.sendMessage(chatId, `❌ Buy failed: ${error.message}`);
+ } catch (error) {
+    console.error('Error in purchaseToken:', error);
+    bot.sendMessage(chatId, "❌ Purchase failed: " + error.message);
   }
 }
 
@@ -602,7 +590,7 @@ async function updateUserTokenHoldings(chatId, tokenAddress, amount) {
   let holdings = {};
 
   if (doc.exists) {
-      holdings = doc.data();
+    holdings = doc.data();
   }
 
   const currentAmount = holdings[tokenAddress] || 0;
@@ -617,16 +605,16 @@ async function sendTokenHoldings(chatId) {
   let userTokenHoldings = await db.collection("userTokenHoldings").doc(chatId.toString()).get();
 
   if (!userTokenHoldings.exists) {
-      bot.sendMessage(chatId, "You currently hold no tokens.");
-      return;
+    bot.sendMessage(chatId, "You currently hold no tokens.");
+    return;
   }
 
   const holdings = userTokenHoldings.data();
   let message = "Your holdings:\n";
 
   for (const [tokenAddress, amount] of Object.entries(holdings)) {
-      const tokenDetails = await fetchTokenDetails(tokenAddress); 
-      message += `Token: ${tokenDetails.name}, Amount: ${amount}, Value: $${tokenDetails.currentValue}\n`;
+    const tokenDetails = await fetchTokenDetails(tokenAddress);
+    message += `Token: ${tokenDetails.name}, Amount: ${amount}, Value: $${tokenDetails.currentValue}\n`;
   }
 
   bot.sendMessage(chatId, message);
