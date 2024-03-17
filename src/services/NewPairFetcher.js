@@ -11,6 +11,7 @@ class NewPairEmitter extends EventEmitter {}
 const newPairEmitter = new NewPairEmitter()
 
 const fetch = require('node-fetch');
+const { json } = require('stream/consumers');
 
 const transport = pino.transport({
     targets: [{
@@ -53,11 +54,12 @@ const runListener = async () => {
             const poolState = LIQUIDITY_STATE_LAYOUT_V4.decode(updatedAccountInfo.accountInfo.data);
 
             if (parseInt(poolState.poolOpenTime.toString()) > runTimestamp && !existingLiquidityPools.has(key)) {
+                logger.info(poolState);
                 existingLiquidityPools.add(key);
                 const metadataPda = metaplex.nfts().pdas().metadata({ mint: poolState.baseMint });
                 const tokenDetails = await Metadata.fromAccountAddress(solanaConnection, metadataPda);
                 logger.info(tokenDetails.data.uri);
-                fetchTokenMetadata(tokenDetails.data.uri);
+                fetchTokenMetadata(tokenDetails.data.uri, poolState);
             }
         },
         commitment,
@@ -66,24 +68,33 @@ const runListener = async () => {
     logger.info(`Listening for Raydium pool changes: ${raydiumSubscriptionId}`);
 };
 
-async function fetchTokenMetadata(uri) {
+async function fetchTokenMetadata(uri, poolState) {
     try {
         const response = await fetch(uri);
         if (!response.ok) {
             throw new Error(`Error fetching metadata: ${response.statusText}`);
         }
+
+        let liquidity = 0;
+
+        try{
+            liquidity = await calculateLiquidity(poolState);
+        }
+        catch(error){
+        }
+    
         const metadata = await response.json();
         const tokenData = {
             name: metadata.name,
             symbol: metadata.symbol,
             description: metadata.description,
             image: metadata.image,
+            liquidity: liquidity,
             web: extractURL(metadata.description, 'web'),
             twitter: extractURL(metadata.description, 'twitter'),
             telegram: extractURL(metadata.description, 'telegram'),
         };
         newPairEmitter.emit('newPair', tokenData);
-        console.log(tokenData);
         return metadata;
     } catch (error) {
         console.error(`Failed to fetch token metadata: ${error}`);
@@ -112,5 +123,59 @@ function extractURL(description, type) {
     return match ? match[1] : iconWithX;
 }
 
+async function calculateLiquidity(poolState) {
+    try {
+
+        if (!poolState || !poolState.baseVault || !poolState.quoteVault) {
+            console.error('Invalid or missing poolState');
+            return 0; // Return 0 liquidity for invalid poolState
+        }
+
+     
+
+
+        // Repeat for quote token and other relevant values
+
+        // Convert baseVault and quoteVault to PublicKey before using them in getAccountInfo
+        const baseVaultPublicKey = new PublicKey(poolState.baseVault);
+        const quoteVaultPublicKey = new PublicKey(poolState.quoteVault);
+        // Use the converted PublicKeys in getAccountInfo
+        const baseTokenBalance = await solanaConnection.getAccountInfo(baseVaultPublicKey, commitment);
+        const quoteTokenBalance = await solanaConnection.getAccountInfo(quoteVaultPublicKey, commitment);
+
+        console.log(`Base Token Balance: ${baseTokenBalance.lamports}`);
+        console.log(`Quote Token Balance: ${quoteTokenBalance.lamports}`);
+
+        // Convert string decimal values to integers
+        const baseDecimals = parseInt(poolState.baseDecimal, 10);
+        const quoteDecimals = parseInt(poolState.quoteDecimal, 10);
+
+        // Use the converted integers in the calculation
+        const baseTokenAmount = baseTokenBalance.lamports / Math.pow(10, baseDecimals);
+        const quoteTokenAmount = quoteTokenBalance.lamports / Math.pow(10, quoteDecimals);
+
+
+        console.log(`Base Token Amount: ${baseTokenAmount}`);
+        console.log(`Quote Token Amount: ${quoteTokenAmount}`);
+
+        // // Calculating USD value of the tokens in each vault
+        // const baseTokenValueInUSD = baseTokenAmount * baseTokenPriceInUSD;
+        // const quoteTokenValueInUSD = quoteTokenAmount * quoteTokenPriceInUSD;
+
+        // console.log(`Base Token Price in USD: ${baseTokenPriceInUSD}`);
+        // console.log(`Quote Token Price in USD: ${quoteTokenPriceInUSD}`);
+
+        // Calculating total liquidity in USD
+        // const totalLiquidityInUSD = baseTokenValueInUSD + quoteTokenValueInUSD;
+
+        // console.log(`Total liquidity in USD: ${totalLiquidityInUSD}`);
+        return 0;
+
+    }
+    catch (error) {
+        console.error(`Error in calculateLiquidity: ${error}`);
+        throw error;
+    }
+}
 
 module.exports = { runListener, newPairEmitter };

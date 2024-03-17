@@ -23,7 +23,7 @@ let transferState = {};
 function startListeningForNewPairs(chatId) {
   runListener();
   newPairEmitter.on('newPair', (tokenData) => {
-      const message = `🆕 New Pair Detected!\n🪙 Name: ${tokenData.name}\n📝 Symbol: ${tokenData.symbol}\n🌐 Website: ${tokenData.web}\n🐦 Twitter: ${tokenData.twitter}\n📱 Telegram: ${tokenData.telegram}`;
+      const message = `🆕 New Pair Detected!\n🪙 Name: ${tokenData.name}\n📝 Symbol: ${tokenData.symbol}\n🌐 Liquidity: ${tokenData.liquidity}\n Website: ${tokenData.web}\n🐦 Twitter: ${tokenData.twitter}\n📱 Telegram: ${tokenData.telegram}`;
       bot.sendMessage(chatId, message);
   });
 }

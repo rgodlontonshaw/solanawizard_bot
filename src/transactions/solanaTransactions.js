@@ -38,7 +38,7 @@ async function transferSOL(db, bot, chatId, recipientAddress, amountSol) {
             })
         );
 
-        var signature = await solanaWeb3.sendAndConfirmTransaction(connection, transaction, [senderKeypair]);
+        const signature = await solanaWeb3.sendAndConfirmTransaction(connection, transaction, [senderKeypair]);
 
         console.log('Transaction successful:', signature);
         bot.sendMessage(chatId, `Successfully transferred ${amountSol} SOL to ${recipientAddress}`);
