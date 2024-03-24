@@ -8,13 +8,13 @@ const TelegramBot = require("node-telegram-bot-api");
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 const db = require("./src/db/FirebaseService.js");
-const { Connection, Keypair, Transaction, sendAndConfirmTransaction, PublicKey, VersionedTransaction } = solanaWeb3;
+const { Connection, Keypair, Transaction, sendAndConfirmTransaction, PublicKey, VersionedTransaction, getProgramAccounts,clusterApiUrl } = solanaWeb3;
 const fetchNewPairs = require("./src/services/NewPairFetcher.js");
 const HelpScreen = require("./src/help/Help.js");
 const fetch = require("node-fetch");
 const { newPairEmitter, runListener } = require("./src/services/NewPairFetcher.js");
 const { Metadata } = require('@metaplex-foundation/mpl-token-metadata');
-const connection = new Connection('https://api.mainnet-beta.solana.com');
+const connection = new Connection(clusterApiUrl('mainnet-beta'));
 const telegramBotInteraction = require('./src/services/TelegramBot.js');
 const userWalletManagement = require('./src/managers/walletmanager.js');
 const fetchCross = require('cross-fetch');
@@ -602,21 +602,62 @@ async function updateUserTokenHoldings(chatId, tokenAddress, amount) {
 }
 
 async function sendTokenHoldings(chatId) {
-  let userTokenHoldings = await db.collection("userTokenHoldings").doc(chatId.toString()).get();
 
-  if (!userTokenHoldings.exists) {
-    bot.sendMessage(chatId, "You currently hold no tokens.");
-    return;
-  }
+  let userWalletDoc = await db.collection("userWallets").doc(chatId.toString());
+  let userWalletData = await userWalletDoc.get();
 
-  const holdings = userTokenHoldings.data();
-  let message = "Your holdings:\n";
+  const publicKey = new PublicKey(userWalletData.data().publicKey);
+  const solBalance = await SolanaService.getSolBalance(publicKey);
+  const formattedSolBalance = solBalance.toFixed(6);
+  solBalanceMain = formattedSolBalance;
 
-  for (const [tokenAddress, amount] of Object.entries(holdings)) {
-    const tokenDetails = await fetchTokenDetails(tokenAddress);
-    message += `Token: ${tokenDetails.name}, Amount: ${amount}, Value: $${tokenDetails.currentValue}\n`;
-  }
+  // const tokenAccounts = await connection.getProgramAccounts(TOKEN_PROGRAM_ID);
 
-  bot.sendMessage(chatId, message);
+  // // Process each token account
+  // let message = "Your holdings:\n";
+  // for (const tokenAccount of tokenAccounts) {
+  //   const tokenInfo = await connection.getTokenAccountBalance(tokenAccount.pubkey);
+    
+  //   // Get token metadata (replace with your actual method to fetch data)
+  //   const tokenMetadata = await fetchTokenMetadata(tokenInfo.value.mint.toString());
+
+  //   allTokens.push({
+  //     mint: tokenInfo.value.mint.toString(),
+  //     balance: tokenInfo.value.amount.toString(),
+  //     name: tokenMetadata.name, // Assuming tokenMetadata has a name property
+  //     symbol: tokenMetadata.symbol, // Assuming tokenMetadata has a symbol property
+  //   });
+    
+  //   message += `Token: ${tokenMetadata.name} (${tokenMetadata.symbol}), Amount: ${tokenInfo.value.amount.toString()}\n`;
+  // }
+
+  // bot.sendMessage(chatId, message);
+
+   const connection = new Connection(clusterApiUrl("mainnet-beta"), "confirmed");
+
+  const accounts = await connection.getProgramAccounts(
+    TOKEN_PROGRAM_ID, // new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+    {
+      dataSlice: {
+        offset: 0, // number of bytes
+        length: 0, // number of bytes
+      },
+      filters: [
+        {
+          dataSize: 165, // number of bytes
+        },
+        {
+          memcmp: {
+            offset: 0, // number of bytes
+            bytes: publicKey, // base58 encoded string
+          },
+        },
+      ],
+    }
+  );
+  console.log(
+    `Found ${accounts.length} token account(s) for mint ${publicKey}`
+  );
+  console.log(accounts);
+
 }
-
