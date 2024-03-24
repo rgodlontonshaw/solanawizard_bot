@@ -5,8 +5,9 @@ const { retrieveEnvVariable } = require('../utils/utils.js');
 const pino = require('pino');
 const { Metaplex } = require('@metaplex-foundation/js');
 const { Metadata } = require("@metaplex-foundation/mpl-token-metadata");
-const TokenInfo = require('../models/TokenInfo.js');
 const EventEmitter = require('events');
+const { parsePoolInfo } = require('./PoolInfo.js'); // Adjust the path based on your directory structure
+
 class NewPairEmitter extends EventEmitter {}
 const newPairEmitter = new NewPairEmitter()
 
@@ -54,11 +55,13 @@ const runListener = async () => {
             const poolState = LIQUIDITY_STATE_LAYOUT_V4.decode(updatedAccountInfo.accountInfo.data);
 
             if (parseInt(poolState.poolOpenTime.toString()) > runTimestamp && !existingLiquidityPools.has(key)) {
-                logger.info(poolState);
+                // logger.info(poolState);
+                parsePoolInfo(key);
+
                 existingLiquidityPools.add(key);
                 const metadataPda = metaplex.nfts().pdas().metadata({ mint: poolState.baseMint });
                 const tokenDetails = await Metadata.fromAccountAddress(solanaConnection, metadataPda);
-                logger.info(tokenDetails.data.uri);
+                // logger.info(tokenDetails.data.uri);
                 fetchTokenMetadata(tokenDetails.data.uri, poolState);
             }
         },
@@ -77,11 +80,11 @@ async function fetchTokenMetadata(uri, poolState) {
 
         let liquidity = 0;
 
-        try{
-            liquidity = await calculateLiquidity(poolState);
-        }
-        catch(error){
-        }
+        // try{
+        //     liquidity = await calculateLiquidity(poolState);
+        // }
+        // catch(error){
+        // }
     
         const metadata = await response.json();
         const tokenData = {
@@ -126,33 +129,19 @@ function extractURL(description, type) {
 async function calculateLiquidity(poolState) {
     try {
 
-        if (!poolState || !poolState.baseVault || !poolState.quoteVault) {
-            console.error('Invalid or missing poolState');
-            return 0; // Return 0 liquidity for invalid poolState
-        }
+        // if (!poolState || !poolState.baseVault || !poolState.quoteVault) {
+        //     console.error('Invalid or missing poolState');
+        //     return 0; // Return 0 liquidity for invalid poolState
+        // }
 
-     
+        const baseDecimal = 10 ** poolState.baseDecimal.toNumber();
+        const quoteDecimal = 10 ** poolState.quoteDecimal.toNumber();
 
+        const baseTokenAmount = await connection.getTokenAccountBalance(poolState.baseVault);
+        const quoteTokenAmount = await connection.getTokenAccountBalance(poolState.quoteVault);
 
-        // Repeat for quote token and other relevant values
-
-        // Convert baseVault and quoteVault to PublicKey before using them in getAccountInfo
-        const baseVaultPublicKey = new PublicKey(poolState.baseVault);
-        const quoteVaultPublicKey = new PublicKey(poolState.quoteVault);
-        // Use the converted PublicKeys in getAccountInfo
-        const baseTokenBalance = await solanaConnection.getAccountInfo(baseVaultPublicKey, commitment);
-        const quoteTokenBalance = await solanaConnection.getAccountInfo(quoteVaultPublicKey, commitment);
-
-        console.log(`Base Token Balance: ${baseTokenBalance.lamports}`);
-        console.log(`Quote Token Balance: ${quoteTokenBalance.lamports}`);
-
-        // Convert string decimal values to integers
-        const baseDecimals = parseInt(poolState.baseDecimal, 10);
-        const quoteDecimals = parseInt(poolState.quoteDecimal, 10);
-
-        // Use the converted integers in the calculation
-        const baseTokenAmount = baseTokenBalance.lamports / Math.pow(10, baseDecimals);
-        const quoteTokenAmount = quoteTokenBalance.lamports / Math.pow(10, quoteDecimals);
+        const basePnl = poolState.baseNeedTakePnl.toNumber() / baseDecimal;
+        const quotePnl = poolState.quoteNeedTakePnl.toNumber() / quoteDecimal;
 
 
         console.log(`Base Token Amount: ${baseTokenAmount}`);

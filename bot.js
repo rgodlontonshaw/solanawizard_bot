@@ -355,6 +355,9 @@ async function fetchTokenMetadata(mintAddress) {
   }
 }
 
+
+
+
 async function fetchTokenDetails(tokenAddress) {
   try {
 
