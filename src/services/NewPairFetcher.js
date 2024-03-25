@@ -6,7 +6,7 @@ const pino = require('pino');
 const { Metaplex } = require('@metaplex-foundation/js');
 const { Metadata } = require("@metaplex-foundation/mpl-token-metadata");
 const EventEmitter = require('events');
-const { parsePoolInfo } = require('./PoolInfo.js'); // Adjust the path based on your directory structure
+const { parsePoolInfo } = require('./PoolInfoByTokenAddress.js'); // Adjust the path based on your directory structure
 
 class NewPairEmitter extends EventEmitter {}
 const newPairEmitter = new NewPairEmitter()
@@ -124,47 +124,6 @@ function extractURL(description, type) {
 
     const match = RegExp(regex).exec(description);
     return match ? match[1] : iconWithX;
-}
-
-async function calculateLiquidity(poolState) {
-    try {
-
-        // if (!poolState || !poolState.baseVault || !poolState.quoteVault) {
-        //     console.error('Invalid or missing poolState');
-        //     return 0; // Return 0 liquidity for invalid poolState
-        // }
-
-        const baseDecimal = 10 ** poolState.baseDecimal.toNumber();
-        const quoteDecimal = 10 ** poolState.quoteDecimal.toNumber();
-
-        const baseTokenAmount = await connection.getTokenAccountBalance(poolState.baseVault);
-        const quoteTokenAmount = await connection.getTokenAccountBalance(poolState.quoteVault);
-
-        const basePnl = poolState.baseNeedTakePnl.toNumber() / baseDecimal;
-        const quotePnl = poolState.quoteNeedTakePnl.toNumber() / quoteDecimal;
-
-
-        console.log(`Base Token Amount: ${baseTokenAmount}`);
-        console.log(`Quote Token Amount: ${quoteTokenAmount}`);
-
-        // // Calculating USD value of the tokens in each vault
-        // const baseTokenValueInUSD = baseTokenAmount * baseTokenPriceInUSD;
-        // const quoteTokenValueInUSD = quoteTokenAmount * quoteTokenPriceInUSD;
-
-        // console.log(`Base Token Price in USD: ${baseTokenPriceInUSD}`);
-        // console.log(`Quote Token Price in USD: ${quoteTokenPriceInUSD}`);
-
-        // Calculating total liquidity in USD
-        // const totalLiquidityInUSD = baseTokenValueInUSD + quoteTokenValueInUSD;
-
-        // console.log(`Total liquidity in USD: ${totalLiquidityInUSD}`);
-        return 0;
-
-    }
-    catch (error) {
-        console.error(`Error in calculateLiquidity: ${error}`);
-        throw error;
-    }
 }
 
 module.exports = { runListener, newPairEmitter };
