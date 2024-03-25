@@ -329,10 +329,13 @@ bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
   bot.sendMessage(chatId, tokenDetailsMessage, opts);
 });
 
-async function sellToken(chatId, tokenAddress) {
+async function sellToken(chatId, tokenMintAddress) {
   try {
 
-    const tokenMintAddress = tokenAddress
+    console.log('tokenMintAddress:', tokenMintAddress);
+    if (!isValidPublicKey(tokenMintAddress)) {
+      throw new Error("Invalid token mint address format.");
+    }
 
     const userWalletDoc = await db.collection("userWallets").doc(chatId.toString()).get();
     if (!userWalletDoc.exists) {
@@ -342,8 +345,19 @@ async function sellToken(chatId, tokenAddress) {
     const secretKey = bs58.decode(userWalletData.secretKey);
     const wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
 
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(wallet.publicKey, {
+      mint: new solanaWeb3.PublicKey(tokenMintAddress),
+    });
 
-    const quoteResponse = await fetch(`https://quote-api.jup.ag/v1/quote?inputMint=${tokenMintAddress}&outputMint=So11111111111111111111111111111111111111112&amount=YOUR_TOKEN_AMOUNT_IN_LAMPORTS&slippage=1`, {
+    if (!tokenAccounts.value[0]) {
+      throw new Error("Token account not found.");
+    }
+
+    const tokenAmount = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+    const tokenAmountInLamports = tokenAmount * solanaWeb3.LAMPORTS_PER_SOL; // Convert to lamports
+
+    // Fetch the quote for selling the token
+    const quoteResponse = await fetch(`https://quote-api.jup.ag/v1/quote?inputMint=${tokenMintAddress}&outputMint=So11111111111111111111111111111111111111112&amount=${tokenAmountInLamports}&slippage=1`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
@@ -510,7 +524,7 @@ async function getUserTokens(chatId) {
       symbol: token.info.symbol,
       balance: token.balance,
       name: token.info.name,
-      mintAddress: token.info.mintAddress,
+      mintAddress: token.address,
     }));
   } else {
     // Handle errors or no tokens found
