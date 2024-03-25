@@ -205,7 +205,7 @@ async function start(chatId) {
     `🌐 <a href="https://solscan.io/account/${publicKey.toString()}">View Wallet on Solscan</a>\n\n` +
     `Get started by exploring the menu below. Happy trading!`;
 
-  sendTokenHoldings(chatId);
+  getTokenHoldings(chatId);
 
   bot.sendMessage(chatId, welcomeMessage, {
     parse_mode: "HTML",
@@ -235,7 +235,7 @@ async function getProfile(chatId) {
     `💰 *Balance:* \`${solBalance.toFixed(6)} SOL\`\n\n\n` +
     `🔍 [View on Solscan](https://solscan.io/account/${publicKey.toString()})`;
 
-  sendTokenHoldings(msg.chat.id);
+  getTokenHoldings(msg.chat.id);
 
   bot.sendMessage(chatId, profileMessage, {
     parse_mode: "Markdown",
@@ -583,25 +583,7 @@ function isValidPublicKey(key) {
   }
 }
 
-async function updateUserTokenHoldings(chatId, tokenAddress, amount) {
-  const userTokenHoldingsDoc = db.collection("userTokenHoldings").doc(chatId.toString());
-
-  const doc = await userTokenHoldingsDoc.get();
-  let holdings = {};
-
-  if (doc.exists) {
-    holdings = doc.data();
-  }
-
-  const currentAmount = holdings[tokenAddress] || 0;
-  holdings[tokenAddress] = currentAmount + amount;
-
-  await userTokenHoldingsDoc.set(holdings);
-
-  bot.sendMessage(chatId, `✅ Holdings updated: ${amount} of ${tokenAddress} added to your wallet.`);
-}
-
-async function sendTokenHoldings(chatId) {
+async function getTokenHoldings(chatId) {
 
   let userWalletDoc = await db.collection("userWallets").doc(chatId.toString());
   let userWalletData = await userWalletDoc.get();
@@ -611,53 +593,28 @@ async function sendTokenHoldings(chatId) {
   const formattedSolBalance = solBalance.toFixed(6);
   solBalanceMain = formattedSolBalance;
 
-  // const tokenAccounts = await connection.getProgramAccounts(TOKEN_PROGRAM_ID);
-
-  // // Process each token account
-  // let message = "Your holdings:\n";
-  // for (const tokenAccount of tokenAccounts) {
-  //   const tokenInfo = await connection.getTokenAccountBalance(tokenAccount.pubkey);
-    
-  //   // Get token metadata (replace with your actual method to fetch data)
-  //   const tokenMetadata = await fetchTokenMetadata(tokenInfo.value.mint.toString());
-
-  //   allTokens.push({
-  //     mint: tokenInfo.value.mint.toString(),
-  //     balance: tokenInfo.value.amount.toString(),
-  //     name: tokenMetadata.name, // Assuming tokenMetadata has a name property
-  //     symbol: tokenMetadata.symbol, // Assuming tokenMetadata has a symbol property
-  //   });
-    
-  //   message += `Token: ${tokenMetadata.name} (${tokenMetadata.symbol}), Amount: ${tokenInfo.value.amount.toString()}\n`;
-  // }
-
-  // bot.sendMessage(chatId, message);
-
-   const connection = new Connection(clusterApiUrl("mainnet-beta"), "confirmed");
-
-  const accounts = await connection.getProgramAccounts(
-    TOKEN_PROGRAM_ID, // new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-    {
-      dataSlice: {
-        offset: 0, // number of bytes
-        length: 0, // number of bytes
-      },
-      filters: [
-        {
-          dataSize: 165, // number of bytes
-        },
-        {
-          memcmp: {
-            offset: 0, // number of bytes
-            bytes: publicKey, // base58 encoded string
-          },
-        },
-      ],
+  const response = await fetch(`https://api.shyft.to/sol/v1/wallet/all_tokens?network=mainnet-beta&wallet=${publicKey}`, {
+    method: 'GET',
+    headers: {
+      'accept': 'application/json',
+      'x-api-key': '-ZMCvwqQpkEEYUvd' 
     }
-  );
-  console.log(
-    `Found ${accounts.length} token account(s) for mint ${publicKey}`
-  );
-  console.log(accounts);
+  });
 
+  const responseData = await response.json();
+
+  if (responseData.success) {
+    let message = "Your holdings:\n";
+    message += `SOL: ${formattedSolBalance}\n`;
+
+    for (const token of responseData.result) {
+      message += `Token: ${token.info.name} (${token.info.symbol}), Amount: ${parseFloat(token.balance).toFixed(token.info.decimals)}\n`;
+    }
+
+    // Send the consolidated message to the user
+    bot.sendMessage(chatId, message);
+  } else {
+    console.error('Failed to fetch token holdings:', responseData.message);
+    bot.sendMessage(chatId, "Sorry, we couldn't fetch your token holdings at this time.");
+  }
 }
