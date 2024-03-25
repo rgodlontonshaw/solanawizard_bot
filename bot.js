@@ -78,6 +78,13 @@ bot.on("callback_query", async (callbackQuery) => {
     return; // Stop further processing since we handled the settings action
   }
 
+  if (data.startsWith("sell_100_")) {
+    console.log(`sell hit for chatId: ${chatId}`);
+    const tokenSymbol = data.split("sell_100_")[1];
+    await sellToken(chatId, tokenSymbol);
+    return; // Stop further processing
+  }
+
   // Define the logic for each callback data
   switch (data) {
     case 'buy':
@@ -150,6 +157,11 @@ bot.on("callback_query", async (callbackQuery) => {
       const settingsScreen = new SettingsScreen(bot, chatId);
       await settingsScreen.showSettings();
       break;
+    case 'sell_100_':
+      console.log(`sell hit for chatId: ${chatId}`);
+      const tokenSymbol = data.split("sell_100_")[1];
+      await sellToken(chatId, tokenSymbol);
+    break;
     case "close":
       try {
         let text = "";
@@ -317,6 +329,86 @@ bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
   bot.sendMessage(chatId, tokenDetailsMessage, opts);
 });
 
+async function sellToken(chatId, tokenSymbol) {
+  try {
+
+    const tokenMintAddress = await resolveTokenMintAddress(tokenSymbol);
+    if (!tokenMintAddress) {
+      throw new Error("Token mint address not found.");
+    }
+
+    const userWalletDoc = await db.collection("userWallets").doc(chatId.toString()).get();
+    if (!userWalletDoc.exists) {
+      throw new Error("Wallet not found.");
+    }
+    const userWalletData = userWalletDoc.data();
+    const secretKey = bs58.decode(userWalletData.secretKey);
+    const wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
+
+    // Fetch the quote for selling the token for SOL (assuming SOL is the target)
+    const quoteResponse = await fetch(`https://quote-api.jup.ag/v1/quote?inputMint=${tokenMintAddress}&outputMint=So11111111111111111111111111111111111111112&amount=YOUR_TOKEN_AMOUNT_IN_LAMPORTS&slippage=1`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).then(response => response.json());
+
+    if (!quoteResponse || !quoteResponse.data) {
+      throw new Error("Failed to fetch quote from Jupiter.");
+    }
+
+    // Execute the swap
+    const swapResponse = await fetch('https://quote-api.jup.ag/v1/swap', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        wallet: wallet.publicKey.toString(),
+        route: quoteResponse.data.route,
+        userPublicKey: wallet.publicKey.toString(),
+        wrapUnwrapSOL: true
+      }),
+    }).then(response => response.json());
+
+    if (!swapResponse || !swapResponse.transaction) {
+      throw new Error("Failed to execute swap on Jupiter.");
+    }
+
+    // Sign and send the transaction
+    const transaction = new solanaWeb3.Transaction().add(solanaWeb3.Transaction.from(swapResponse.transaction));
+    transaction.feePayer = wallet.publicKey;
+    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+    transaction.sign(wallet);
+
+    const serializedTransaction = transaction.serialize();
+    const txid = await connection.sendRawTransaction(serializedTransaction, {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed'
+    });
+
+    console.log(`Swap successful with transaction ID: ${txid}`);
+    bot.sendMessage(chatId, `✅ Successfully sold ${tokenSymbol}. Transaction ID: ${txid}`, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('Error in sellToken:', error);
+    bot.sendMessage(chatId, `❌ Sell failed: ${error.message}`);
+  }
+}
+
+async function resolveTokenMintAddress(tokenSymbol) {
+  const url = `https://api.jup.ag/v1/tokens/${tokenSymbol}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch token information for ${tokenSymbol}`);
+    }
+    const tokenData = await response.json();
+    return tokenData?.mint || null; // Check for existence of mint property
+  } catch (error) {
+    console.error('Error fetching token mint address:', error);
+    return null;
+  }
+}
 
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
@@ -371,20 +463,64 @@ async function handleBuy(chatId) {
 }
 
 async function handleSell(chatId) {
+
+  let tokens = await getUserTokens(chatId);
+  let inline_keyboard = [];
+  
+  for (const token of tokens) {
+    inline_keyboard.push([
+      { text: `${token.name}`, callback_data: 'do_nothing' }
+    ]);
+    inline_keyboard.push([
+      { text: `Sell X% ${token.symbol}`, callback_data: `sell_x_${token.symbol}` },
+      { text: `Sell 100% ${token.symbol}`, callback_data: `sell_100_${token.symbol}` },
+    ]);
+  }
+  
+  
+  inline_keyboard.push(
+    [{ text: '❌ Close', callback_data: 'close' }]
+  );
+
   const sellOptions = {
     parse_mode: 'HTML',
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '🪄 Sell 0.5 SOL', callback_data: 'sell_0.5_sol' }, { text: '1 SOL', callback_data: 'sell_1_sol' }, { text: '🪄 Sell 3 SOL', callback_data: 'sell_3_sol' }],
-        [{ text: '🪄 Sell 5 SOL', callback_data: 'sell_5_sol' }, { text: '10 SOL', callback_data: 'sell_10_sol' }, { text: '🪄 Sell X SOL', callback_data: 'sell_custom_sol' }],
-        [{ text: '🪄 15% Slippage', callback_data: 'sell_15_slippage' }, { text: '🪄 X Slippage', callback_data: 'sell_custom_slippage' }],
-        [{ text: '❌ Close', callback_data: 'close' }]
-      ]
-    }
+    reply_markup: { inline_keyboard: inline_keyboard }
   };
+
   bot.sendMessage(chatId, "Select sell options:", sellOptions);
   console.log(`Handling sell for chatId: ${chatId}`);
 }
+
+async function getUserTokens(chatId) {
+  // Retrieve the user's public key from the database
+  let userWalletDoc = await db.collection("userWallets").doc(chatId.toString());
+  let userWalletData = await userWalletDoc.get();
+  const publicKey = userWalletData.data().publicKey; 
+  
+  const response = await fetch(`https://api.shyft.to/sol/v1/wallet/all_tokens?network=mainnet-beta&wallet=${publicKey}`, {
+    method: 'GET',
+    headers: {
+      'accept': 'application/json',
+      'x-api-key': '-ZMCvwqQpkEEYUvd',
+    }
+  });
+
+  const responseData = await response.json();
+  
+  if (responseData.success && responseData.result) {
+    // Transform the response data into an array of token objects with symbol and balance.
+    return responseData.result.map(token => ({
+      symbol: token.info.symbol,
+      balance: token.balance,
+      name: token.info.name
+    }));
+  } else {
+    // Handle errors or no tokens found
+    console.error('Failed to fetch token holdings:', responseData.message);
+    return [];
+  }
+}
+
 
 async function getMetadataPDA(mintAddress) {
   try {
@@ -407,7 +543,7 @@ async function getMetadataPDA(mintAddress) {
     return pda;
   } catch (error) {
     console.error('Error in getMetadataPDA:', error);
-    // Include more details in the thrown error if the initial validation fails
+ 
     if (error.message.includes('Invalid mint address format')) {
       throw new Error(`Invalid mint address: Type: ${typeof mintAddress}, Length: ${mintAddress ? mintAddress.length : 'N/A'}, Value: ${mintAddress}`);
     } else {
@@ -508,7 +644,7 @@ async function purchaseToken(chatId, amount) {
       userPublicKey: wallet.publicKey.toString(),
       wrapAndUnwrapSol: true,
       inputMint: 'So11111111111111111111111111111111111111112', 
-      outputMint: tokenAddress, // The target token's mint address
+      outputMint: tokenAddress, 
     };
 
     // Step 1: Perform the swap request and handle the response
@@ -618,3 +754,4 @@ async function getTokenHoldings(chatId) {
     bot.sendMessage(chatId, "Sorry, we couldn't fetch your token holdings at this time.");
   }
 }
+
