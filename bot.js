@@ -159,8 +159,8 @@ bot.on("callback_query", async (callbackQuery) => {
       break;
     case 'sell_100_':
       console.log(`sell hit for chatId: ${chatId}`);
-      const tokenSymbol = data.split("sell_100_")[1];
-      await sellToken(chatId, tokenSymbol);
+      const tokenMintAddress = data.split("sell_100_")[1];
+      await sellToken(chatId, tokenMintAddress);
     break;
     case "close":
       try {
@@ -329,13 +329,10 @@ bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
   bot.sendMessage(chatId, tokenDetailsMessage, opts);
 });
 
-async function sellToken(chatId, tokenSymbol) {
+async function sellToken(chatId, tokenAddress) {
   try {
 
-    const tokenMintAddress = await resolveTokenMintAddress(tokenSymbol);
-    if (!tokenMintAddress) {
-      throw new Error("Token mint address not found.");
-    }
+    const tokenMintAddress = tokenAddress
 
     const userWalletDoc = await db.collection("userWallets").doc(chatId.toString()).get();
     if (!userWalletDoc.exists) {
@@ -345,7 +342,7 @@ async function sellToken(chatId, tokenSymbol) {
     const secretKey = bs58.decode(userWalletData.secretKey);
     const wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
 
-    // Fetch the quote for selling the token for SOL (assuming SOL is the target)
+
     const quoteResponse = await fetch(`https://quote-api.jup.ag/v1/quote?inputMint=${tokenMintAddress}&outputMint=So11111111111111111111111111111111111111112&amount=YOUR_TOKEN_AMOUNT_IN_LAMPORTS&slippage=1`, {
       method: 'GET',
       headers: {
@@ -472,8 +469,8 @@ async function handleSell(chatId) {
       { text: `${token.name}`, callback_data: 'do_nothing' }
     ]);
     inline_keyboard.push([
-      { text: `Sell X% ${token.symbol}`, callback_data: `sell_x_${token.symbol}` },
-      { text: `Sell 100% ${token.symbol}`, callback_data: `sell_100_${token.symbol}` },
+      { text: `Sell X% ${token.symbol}`, callback_data: `sell_x_${token.mintAddress}` },
+      { text: `Sell 100% ${token.symbol}`, callback_data: `sell_100_${token.mintAddress}` },
     ]);
   }
   
@@ -512,7 +509,8 @@ async function getUserTokens(chatId) {
     return responseData.result.map(token => ({
       symbol: token.info.symbol,
       balance: token.balance,
-      name: token.info.name
+      name: token.info.name,
+      mintAddress: token.info.mintAddress,
     }));
   } else {
     // Handle errors or no tokens found
