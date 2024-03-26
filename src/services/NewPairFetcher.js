@@ -6,7 +6,7 @@ const pino = require('pino');
 const { Metaplex } = require('@metaplex-foundation/js');
 const { Metadata } = require("@metaplex-foundation/mpl-token-metadata");
 const EventEmitter = require('events');
-const { parsePoolInfo } = require('./PoolInfoByTokenAddress.js'); // Adjust the path based on your directory structure
+const { parsePoolInfo } = require('./PoolInfoByTokenAddress.js'); 
 
 class NewPairEmitter extends EventEmitter {}
 const newPairEmitter = new NewPairEmitter()
