@@ -331,7 +331,6 @@ bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
 
 async function sellToken(chatId, tokenMintAddress) {
   try {
-
     console.log('tokenMintAddress:', tokenMintAddress);
     if (!isValidPublicKey(tokenMintAddress)) {
       throw new Error("Invalid token mint address format.");
@@ -354,52 +353,70 @@ async function sellToken(chatId, tokenMintAddress) {
     }
 
     const tokenAmount = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
-    const tokenAmountInLamports = tokenAmount * solanaWeb3.LAMPORTS_PER_SOL; // Convert to lamports
+    const tokenAmountInLamports = tokenAmount * solanaWeb3.LAMPORTS_PER_SOL;
+    console.log(`tokenAmountInLamports: ${tokenAmountInLamports}`);
+
+
+    console.log(`Mint Address: ${tokenMintAddress}, Amount in Lamports: ${tokenAmountInLamports}`);
 
     // Fetch the quote for selling the token
-    const quoteResponse = await fetch(`https://quote-api.jup.ag/v1/quote?inputMint=${tokenMintAddress}&outputMint=So11111111111111111111111111111111111111112&amount=${tokenAmountInLamports}&slippage=1`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    }).then(response => response.json());
+    
+    const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${tokenMintAddress}&outputMint=So11111111111111111111111111111111111111112&amount=${tokenAmountInLamports}&slippageBps=50`;
+    const quoteResponse = await fetch(quoteUrl);
 
-    if (!quoteResponse || !quoteResponse.data) {
-      throw new Error("Failed to fetch quote from Jupiter.");
+    console.log("Quote response received:", await quoteResponse.json());
+
+    if (!quoteResponse.ok) {
+      throw new Error(`Failed to fetch quote: ${quoteResponse.statusText}`);
     }
+    // const quoteData = await quoteResponse.json();
 
-    // Execute the swap
-    const swapResponse = await fetch('https://quote-api.jup.ag/v1/swap', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        wallet: wallet.publicKey.toString(),
-        route: quoteResponse.data.route,
-        userPublicKey: wallet.publicKey.toString(),
-        wrapUnwrapSOL: true
-      }),
-    }).then(response => response.json());
+    // Get serialized transactions for the swap
+    const {swapTransaction}  = await (
+      await fetch('https://quote-api.jup.ag/v6/swap', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          // quoteResponse from /quote api
+          quoteResponse,
+          // user public key to be used for the swap
+          userPublicKey: wallet.publicKey.toString(),
+          // auto wrap and unwrap SOL. default is true
+          wrapAndUnwrapSol: true,
+          // feeAccount is optional. Use if you want to charge a fee.  feeBps must have been passed in /quote API.
+          // feeAccount: "fee_account_public_key"
+        })
+      })
+    ).json();
 
-    if (!swapResponse || !swapResponse.transaction) {
-      throw new Error("Failed to execute swap on Jupiter.");
+    console.log("Swap response received:", swapTransaction);
+
+    if (!swapTransaction.ok) {
+      throw new Error(`Failed to fetch swap transaction: ${swapTransaction.statusText}`);
     }
+    // const { swapTransaction } = await swapResponse.json();
 
-    // Sign and send the transaction
-    const transaction = new solanaWeb3.Transaction().add(solanaWeb3.Transaction.from(swapResponse.transaction));
-    transaction.feePayer = wallet.publicKey;
-    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
-    transaction.sign(wallet);
+    // Deserialize the transaction
+    const swapTransactionBuf = Buffer.from(swapTransaction, 'base64');
+    var transaction = solanaWeb3.VersionedTransaction.deserialize(swapTransactionBuf);
+    console.log(transaction);
 
-    const serializedTransaction = transaction.serialize();
-    const txid = await connection.sendRawTransaction(serializedTransaction, {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed'
+    // Sign the transaction
+    transaction.sign([wallet]);
+
+    // Execute the transaction
+    const rawTransaction = transaction.serialize();
+    const txid = await connection.sendRawTransaction(rawTransaction, {
+      skipPreflight: true,
+      maxRetries: 2
     });
+    await connection.confirmTransaction(txid);
+    console.log(`https://solscan.io/tx/${txid}`);
 
     console.log(`Swap successful with transaction ID: ${txid}`);
-    bot.sendMessage(chatId, `✅ Successfully sold ${tokenSymbol}. Transaction ID: ${txid}`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `✅ Successfully sold. Transaction ID: ${txid}`, { parse_mode: 'Markdown' });
   } catch (error) {
     console.error('Error in sellToken:', error);
     bot.sendMessage(chatId, `❌ Sell failed: ${error.message}`);
