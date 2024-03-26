@@ -108,23 +108,11 @@ class PriceLiquidityMonitor extends EventEmitter {
             openOrders.quoteTokenTotal.toNumber() / quoteDecimal;
 
         const base =
-            (baseTokenAmount.value?.uiAmount || 0) + openOrdersBaseTokenTotal - basePnl;
+            (baseTokenAmount.value?.uiAmount || 0) + openOrdersBaseTokenTotal;
         const quote =
             (quoteTokenAmount.value?.uiAmount || 0) +
-            openOrdersQuoteTokenTotal -
-            quotePnl;
+            openOrdersQuoteTokenTotal;
 
-
-
-
-
-        // const baseVaultBalanceAmount = baseVaultBalance.value.uiAmount;
-        // const quoteVaultBalanceAmount = quoteVaultBalance.value.uiAmount;
-
-        // if (baseVaultBalanceAmount === 0) {
-        //     console.error('Base Vault Balance Amount is 0, cannot calculate price.');
-        //     return; // Exit the function to avoid division by zero
-        // }
 
         const baseTokenPriceInSOL = quote / base;
         const fullPrice = baseTokenPriceInSOL * this.solPriceInUSD;
@@ -143,7 +131,7 @@ class PriceLiquidityMonitor extends EventEmitter {
 
     async startPolling() {
         await this.fetchSolPrice(); // Fetch the initial price before starting to poll
-        this.interval = setInterval(() => this.fetchPoolStateAndCalculate(), 2000); // Fetch and calculate every second
+        this.interval = setInterval(() => this.fetchPoolStateAndCalculate(), 1000); // Fetch and calculate every second
     }
 
     stopPolling() {
