@@ -83,12 +83,25 @@ class PoolInfoService {
 
     try {
       const data = await this.graphQLClient.request(query, variables);
+      console.log("Data fetched successfully:", data);
       return data; 
     } catch (error) {
       console.error("GraphQL query failed:", error);
       throw error;
     }
   }
+  
 }
+
+const poolInfoService = new PoolInfoService();
+  const tokenAddress = 'GPjNUrcXpUMv22kWiZwieMDzP2eNz8NgmDfb48LpDM3K';
+  try {
+    const data =  poolInfoService.queryLpByAddress(tokenAddress);
+    console.log("Queried Data:", data);
+  } catch (error) {
+    console.error("Error querying data:", error);
+ }
+
+
 
 module.exports = PoolInfoService;
