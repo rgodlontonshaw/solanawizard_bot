@@ -344,43 +344,70 @@ async function sellToken(chatId, tokenMintAddress) {
     const secretKey = bs58.decode(userWalletData.secretKey);
     const wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
 
+
+
     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(wallet.publicKey, {
       mint: new solanaWeb3.PublicKey(tokenMintAddress),
     });
 
+    
+
     if (!tokenAccounts.value[0]) {
       throw new Error("Token account not found.");
     }
+    const tokenInfo = tokenAccounts.value[0].account.data.parsed.info;
 
-    const tokenAmount = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
-    const tokenAmountInLamports = tokenAmount * solanaWeb3.LAMPORTS_PER_SOL;
-    console.log(`tokenAmountInLamports: ${tokenAmountInLamports}`);
+    const mintAddress = tokenInfo.mint;
+    const owner = tokenInfo.owner;
+    const amount = tokenInfo.tokenAmount.amount; // This is the amount in the smallest unit.
+    const decimals = tokenInfo.tokenAmount.decimals;
 
+    // console.log(`Mint Address: ${mintAddress}`);
+    // console.log(`Owner: ${owner}`);
+    // console.log(`Amount: ${amount}`);
+    // console.log(`Decimals: ${decimals}`);
 
-    console.log(`Mint Address: ${tokenMintAddress}, Amount in Lamports: ${tokenAmountInLamports}`);
-
-    // Fetch the quote for selling the token
     
-    const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${tokenMintAddress}&outputMint=So11111111111111111111111111111111111111112&amount=${tokenAmountInLamports}&slippageBps=50`;
+    const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${tokenMintAddress}&outputMint=So11111111111111111111111111111111111111112&amount=${amount}&slippageBps=50`;
     const quoteResponse = await fetch(quoteUrl);
 
-    console.log("Quote response received:", await quoteResponse.json());
 
     if (!quoteResponse.ok) {
       throw new Error(`Failed to fetch quote: ${quoteResponse.statusText}`);
     }
+
+    // console.log("Quote Response:", quoteResponse);
+
+    const quoteResponseJson = await quoteResponse.json();
+
+   
+
+    // console.log("Quote Response JSON:", JSON.stringify(quoteResponseJson));
+
     // const quoteData = await quoteResponse.json();
 
     // Get serialized transactions for the swap
-    const {swapTransaction}  = await (
-      await fetch('https://quote-api.jup.ag/v6/swap', {
+    // console.log("Preparing swap transaction with the following details:");
+    // console.log(`Quote Response: ${JSON.stringify(quoteResponseJson)}`); // Updated to log the JSON response
+    // console.log(`User Public Key: ${wallet.publicKey.toString()}`);
+    // console.log("Wrap and Unwrap SOL: true");
+    // Note: feeAccount is optional and not included in this transaction, so it's not logged
+    // console.log(JSON.stringify({
+    //   quoteResponse: quoteResponseJson,
+    //   userPublicKey: wallet.publicKey.toString(),
+    //   wrapAndUnwrapSol: true,
+    // }));
+    // console.log(this.toString(quoteResponseJson));
+
+    const swapTransaction = await 
+      fetch('https://quote-api.jup.ag/v6/swap', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           // quoteResponse from /quote api
-          quoteResponse,
+          quoteResponse: quoteResponseJson,
           // user public key to be used for the swap
           userPublicKey: wallet.publicKey.toString(),
           // auto wrap and unwrap SOL. default is true
@@ -388,19 +415,28 @@ async function sellToken(chatId, tokenMintAddress) {
           // feeAccount is optional. Use if you want to charge a fee.  feeBps must have been passed in /quote API.
           // feeAccount: "fee_account_public_key"
         })
-      })
-    ).json();
+    });
 
-    console.log("Swap response received:", swapTransaction);
+
 
     if (!swapTransaction.ok) {
       throw new Error(`Failed to fetch swap transaction: ${swapTransaction.statusText}`);
     }
-    // const { swapTransaction } = await swapResponse.json();
+    const swapTransactionJson  = await swapTransaction.json();
+
+    console.log("Swap Transaction JSON:", JSON.stringify(swapTransactionJson));
+
 
     // Deserialize the transaction
-    const swapTransactionBuf = Buffer.from(swapTransaction, 'base64');
-    var transaction = solanaWeb3.VersionedTransaction.deserialize(swapTransactionBuf);
+    const swapTransactionBuf = Buffer.from(JSON.stringify(swapTransactionJson), 'base64');
+
+    console.log("Swap Transaction Buffer:", swapTransactionBuf.toString());
+
+    //ERROR IS SOMEWHEERE HERE 
+    const transaction = solanaWeb3.VersionedTransaction.deserialize(swapTransactionBuf);
+
+    // const serialized = Buffer.from(transaction.serialize()).toString('base64');
+
     console.log(transaction);
 
     // Sign the transaction
@@ -408,6 +444,7 @@ async function sellToken(chatId, tokenMintAddress) {
 
     // Execute the transaction
     const rawTransaction = transaction.serialize();
+
     const txid = await connection.sendRawTransaction(rawTransaction, {
       skipPreflight: true,
       maxRetries: 2
