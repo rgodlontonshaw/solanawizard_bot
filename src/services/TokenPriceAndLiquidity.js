@@ -71,7 +71,6 @@ class PriceLiquidityMonitor extends EventEmitter {
 
     async fetchPoolStateAndCalculate() {
         
-        // console.log('Fetching PoolState:');
         const accountInfo = await solanaConnection.getAccountInfo(this.poolKey);
         const poolState = LIQUIDITY_STATE_LAYOUT_V4.decode(accountInfo.data);
 
@@ -81,13 +80,6 @@ class PriceLiquidityMonitor extends EventEmitter {
             poolState.openOrders,
             OPENBOOK_PROGRAM_ID // OPENBOOK_PROGRAM_ID(marketProgramId) of each pool can get from api: https://api.raydium.io/v2/sdk/liquidity/mainnet.json
           );
-
-        // const baseVaultKey = new PublicKey(poolState.baseVault);
-        // const quoteVaultKey = new PublicKey(poolState.quoteVault);
-
-        // Fetch the vault balances
-        // const baseVaultBalance = await solanaConnection.getTokenAccountBalance(baseVaultKey);
-        // const quoteVaultBalance = await solanaConnection.getTokenAccountBalance(quoteVaultKey);
 
         const baseDecimal = 10 ** poolState.baseDecimal.toNumber(); // e.g. 10 ^ 6
         const quoteDecimal = 10 ** poolState.quoteDecimal.toNumber();
