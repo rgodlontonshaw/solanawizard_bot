@@ -319,9 +319,9 @@ bot.onText(/([A-HJ-NP-Za-km-z1-9]{44})/, async (msg, match) => {
     reply_markup: {
       inline_keyboard: [
         [{ text: '🔄 Swap', callback_data: 'swap' }, { text: '🪄 Limit', callback_data: 'limit' }, { text: '🪄 DCA', callback_data: 'dca' }],
-        [{ text: ' 🪄 Buy 0.5 SOL', callback_data: '0.5_sol' }, { text: '1 SOL', callback_data: '1_sol' }, { text: '🪄 Buy 3 SOL', callback_data: '3_sol' }],
-        [{ text: '🪄 Buy 5 SOL', callback_data: '5_sol' }, { text: '10 SOL', callback_data: '10_sol' }, { text: '🪄 Buy X SOL', callback_data: 'custom_sol' }],
-        [{ text: '🪄 15% Slippage', callback_data: '15_slippage' }, { text: '🪄 X Slippage', callback_data: 'custom_slippage' }],
+        [{ text: '1 SOL', callback_data: '1_sol' }, { text: '🪄 Buy 3 SOL', callback_data: '3_sol' }],
+        [{ text: '🪄 Buy 5 SOL', callback_data: '5_sol' }, { text: '🪄 Buy X SOL', callback_data: 'custom_sol' },],
+        [{ text: '🪄 X Slippage', callback_data: 'custom_slippage' }],
         [{ text: '❌ Close', callback_data: 'close' }]
       ]
     }
