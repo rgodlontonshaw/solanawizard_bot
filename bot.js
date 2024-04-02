@@ -746,7 +746,7 @@ async function createLimitOrder(inputMint, outputMint, inAmount, percentageROI){
         body: JSON.stringify({
           owner: wallet.publicKey.toString(),
           inAmount: inAmount, // 1000000 => 1 USDC if inputToken.address is USDC mint
-          outAmount: calculateSolOutAmountOnSell(inAmount, inputMint , percentageROI), //todo call dif method on buy
+          outAmount: calculateSolOutAmountOnSell(inAmount, inputMint , percentageROI), //todo call dif method on buy pass in boolean
           inputMint: inputMint.toString(),
           outputMint: outputMint.toString(),
           expiredAt: null, // new Date().valueOf() / 1000,
