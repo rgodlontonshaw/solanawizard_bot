@@ -5,12 +5,14 @@ const { retrieveEnvVariable } = require('../utils/utils.js');
 const pino = require('pino');
 const { Metaplex } = require('@metaplex-foundation/js');
 const { Metadata } = require("@metaplex-foundation/mpl-token-metadata");
-const TokenInfo = require('../models/TokenInfo.js');
 const EventEmitter = require('events');
+const { parsePoolInfo } = require('./PoolInfoByTokenAddress.js'); 
+
 class NewPairEmitter extends EventEmitter {}
 const newPairEmitter = new NewPairEmitter()
 
 const fetch = require('node-fetch');
+const { json } = require('stream/consumers');
 
 const transport = pino.transport({
     targets: [{
@@ -53,11 +55,14 @@ const runListener = async () => {
             const poolState = LIQUIDITY_STATE_LAYOUT_V4.decode(updatedAccountInfo.accountInfo.data);
 
             if (parseInt(poolState.poolOpenTime.toString()) > runTimestamp && !existingLiquidityPools.has(key)) {
+                // logger.info(poolState);
+                parsePoolInfo(key);
+
                 existingLiquidityPools.add(key);
                 const metadataPda = metaplex.nfts().pdas().metadata({ mint: poolState.baseMint });
                 const tokenDetails = await Metadata.fromAccountAddress(solanaConnection, metadataPda);
-                logger.info(tokenDetails.data.uri);
-                fetchTokenMetadata(tokenDetails.data.uri);
+                // logger.info(tokenDetails.data.uri);
+                fetchTokenMetadata(tokenDetails.data.uri, poolState);
             }
         },
         commitment,
@@ -66,24 +71,33 @@ const runListener = async () => {
     logger.info(`Listening for Raydium pool changes: ${raydiumSubscriptionId}`);
 };
 
-async function fetchTokenMetadata(uri) {
+async function fetchTokenMetadata(uri, poolState) {
     try {
         const response = await fetch(uri);
         if (!response.ok) {
             throw new Error(`Error fetching metadata: ${response.statusText}`);
         }
+
+        let liquidity = 0;
+
+        // try{
+        //     liquidity = await calculateLiquidity(poolState);
+        // }
+        // catch(error){
+        // }
+    
         const metadata = await response.json();
         const tokenData = {
             name: metadata.name,
             symbol: metadata.symbol,
             description: metadata.description,
             image: metadata.image,
+            liquidity: liquidity,
             web: extractURL(metadata.description, 'web'),
             twitter: extractURL(metadata.description, 'twitter'),
             telegram: extractURL(metadata.description, 'telegram'),
         };
         newPairEmitter.emit('newPair', tokenData);
-        console.log(tokenData);
         return metadata;
     } catch (error) {
         console.error(`Failed to fetch token metadata: ${error}`);
@@ -111,6 +125,5 @@ function extractURL(description, type) {
     const match = RegExp(regex).exec(description);
     return match ? match[1] : iconWithX;
 }
-
 
 module.exports = { runListener, newPairEmitter };

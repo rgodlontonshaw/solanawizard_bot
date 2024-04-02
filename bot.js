@@ -23,6 +23,8 @@ const TRANSACTION_FEE_PAYER_COUNT = 1;
 const { VersionedMessage } = require("@solana/web3.js");
 const { TOKEN_PROGRAM_ID } = require("@project-serum/anchor/dist/cjs/utils/token.js");
 const METAPLEX_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+const priceLiquidityMonitor = require('./src/services/TokenPriceAndLiquidity.js');
+
 
 let solBalanceMain = '';
 let tokenAddress = "";
@@ -348,23 +350,23 @@ async function sellToken(chatId, tokenMintAddress) {
       mint: new solanaWeb3.PublicKey(tokenMintAddress),
     });
 
-    
+
     if (!tokenAccounts.value[0]) {
       throw new Error("Token account not found.");
     }
     const tokenInfo = tokenAccounts.value[0].account.data.parsed.info;
 
     const amount = tokenInfo.tokenAmount.amount; // This is the amount in the smallest unit.
- 
+
     const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${tokenMintAddress}&outputMint=So11111111111111111111111111111111111111112&amount=${amount}&slippageBps=50`;
     const quoteResponse = await fetch(quoteUrl).then(response => response.json());
 
     const requestBody = {
-      quoteResponse, 
+      quoteResponse,
       userPublicKey: wallet.publicKey.toString(),
       wrapAndUnwrapSol: true,
-      inputMint: tokenAddress, 
-      outputMint: 'So11111111111111111111111111111111111111112', 
+      inputMint: tokenAddress,
+      outputMint: 'So11111111111111111111111111111111111111112',
     };
 
     const response = await fetch('https://quote-api.jup.ag/v6/swap', {
@@ -395,24 +397,24 @@ async function sellToken(chatId, tokenMintAddress) {
      try {
       // Serialize the transaction
       const serializedTransaction = transaction.serialize();
-  
+
       // Send the serialized transaction
       const txid = await connection.sendRawTransaction(serializedTransaction, {
           skipPreflight: true,
           preflightCommitment: 'confirmed',
       });
-  
+
       console.log(`Transaction successful with ID: ${txid}`);
       console.log(`Swap successful: https://solscan.io/tx/${txid}`);
       bot.sendMessage(chatId, `✅ Sell successful: [View Transaction](https://solscan.io/tx/${txid})`, { parse_mode: 'Markdown' });
-   
+
     } catch (error) {
         console.error('Error sending transaction:', error);
         bot.sendMessage(chatId, `❌ Sell failed: ${error.message}`);
     }
   }catch(error){
     console.error('Error selling token:', error);
-  } 
+  }
 }
 
 
@@ -487,7 +489,7 @@ async function handleSell(chatId) {
 
   let tokens = await getUserTokens(chatId);
   let inline_keyboard = [];
-  
+
   for (const token of tokens) {
     inline_keyboard.push([
       { text: `${token.name}`, callback_data: 'do_nothing' }
@@ -497,8 +499,8 @@ async function handleSell(chatId) {
       { text: `Sell 100% ${token.symbol}`, callback_data: `sell_100_${token.mintAddress}` },
     ]);
   }
-  
-  
+
+
   inline_keyboard.push(
     [{ text: '❌ Close', callback_data: 'close' }]
   );
@@ -516,8 +518,8 @@ async function getUserTokens(chatId) {
   // Retrieve the user's public key from the database
   let userWalletDoc = await db.collection("userWallets").doc(chatId.toString());
   let userWalletData = await userWalletDoc.get();
-  const publicKey = userWalletData.data().publicKey; 
-  
+  const publicKey = userWalletData.data().publicKey;
+
   const response = await fetch(`https://api.shyft.to/sol/v1/wallet/all_tokens?network=mainnet-beta&wallet=${publicKey}`, {
     method: 'GET',
     headers: {
@@ -527,7 +529,7 @@ async function getUserTokens(chatId) {
   });
 
   const responseData = await response.json();
-  
+
   if (responseData.success && responseData.result) {
     // Transform the response data into an array of token objects with symbol and balance.
     return responseData.result.map(token => ({
@@ -565,7 +567,7 @@ async function getMetadataPDA(mintAddress) {
     return pda;
   } catch (error) {
     console.error('Error in getMetadataPDA:', error);
- 
+
     if (error.message.includes('Invalid mint address format')) {
       throw new Error(`Invalid mint address: Type: ${typeof mintAddress}, Length: ${mintAddress ? mintAddress.length : 'N/A'}, Value: ${mintAddress}`);
     } else {
@@ -646,7 +648,7 @@ async function purchaseToken(chatId, amount) {
     }
 
     const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
-   
+
 
     const feePercentage = 0.005; // 0.5%
     const purchaseAmountInLamports = amount * solanaWeb3.LAMPORTS_PER_SOL;
@@ -662,11 +664,11 @@ async function purchaseToken(chatId, amount) {
     const wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
     const quoteResponse = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${tokenAddress}&amount=${totalAmount}&slippageBps=50`).then(response => response.json());
     const requestBody = {
-      quoteResponse, 
+      quoteResponse,
       userPublicKey: wallet.publicKey.toString(),
       wrapAndUnwrapSol: true,
-      inputMint: 'So11111111111111111111111111111111111111112', 
-      outputMint: tokenAddress, 
+      inputMint: 'So11111111111111111111111111111111111111112',
+      outputMint: tokenAddress,
     };
 
     // Step 1: Perform the swap request and handle the response
@@ -689,26 +691,26 @@ async function purchaseToken(chatId, amount) {
     if (!swapTransaction) {
       throw new Error('swapTransaction is undefined');
     }
- 
+
     const swapTransactionBuf = Buffer.from(swapTransaction, 'base64');
     var transaction = VersionedTransaction.deserialize(swapTransactionBuf);
     console.log(transaction);
     transaction.sign([wallet]);
-  
+
     try {
       // Serialize the transaction
       const serializedTransaction = transaction.serialize();
-  
+
       // Send the serialized transaction
       const txid = await connection.sendRawTransaction(serializedTransaction, {
           skipPreflight: true,
           preflightCommitment: 'confirmed',
       });
-  
+
       console.log(`Transaction successful with ID: ${txid}`);
       console.log(`Swap successful: https://solscan.io/tx/${txid}`);
       bot.sendMessage(chatId, `✅ Purchase successful: [View Transaction](https://solscan.io/tx/${txid})`, { parse_mode: 'Markdown' });
-   
+
     } catch (error) {
         console.error('Error sending transaction:', error);
     }
@@ -719,7 +721,7 @@ async function purchaseToken(chatId, amount) {
   }
 }
 
-async function createLimitOrder(inputMint, outputMint, inAmount, outAmount){
+async function createLimitOrder(inputMint, outputMint, inAmount, percentageROI){
   try{
     const userWalletDoc = await db.collection("userWallets").doc(chatId.toString()).get();
     const userWalletData = userWalletDoc.data();
@@ -734,7 +736,7 @@ async function createLimitOrder(inputMint, outputMint, inAmount, outAmount){
     const secretKey = bs58.decode(userWalletData.secretKey);
     const wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
     const base = Keypair.generate();
-    
+
     const transactions = await (
       await fetch('https://jup.ag/api/limit/v1/createOrder', {
         method: 'POST',
@@ -744,7 +746,7 @@ async function createLimitOrder(inputMint, outputMint, inAmount, outAmount){
         body: JSON.stringify({
           owner: wallet.publicKey.toString(),
           inAmount: inAmount, // 1000000 => 1 USDC if inputToken.address is USDC mint
-          outAmount: outAmount,
+          outAmount: calculateSolOutAmountOnSell(inAmount, inputMint , percentageROI), //todo call dif method on buy
           inputMint: inputMint.toString(),
           outputMint: outputMint.toString(),
           expiredAt: null, // new Date().valueOf() / 1000,
@@ -759,7 +761,7 @@ async function createLimitOrder(inputMint, outputMint, inAmount, outAmount){
     );
 
     const { tx } = await transactions.json;
-    
+
     const transactionBuf = Buffer.from(tx, "base64");
     var transaction = VersionedTransaction.deserialize(transactionBuf);
     transaction.sign([wallet.payer, base]);
@@ -776,14 +778,23 @@ async function createLimitOrder(inputMint, outputMint, inAmount, outAmount){
   }
 }
 
-function calculateSolOutAmountOnSell(inAmount, percentageROI){
+async function calculateSolOutAmountOnSell(inAmount,mintAddress,percentageROI){
     //todo get current sol price
     //get price in sol of token based off in amount
     // calculate outAmount in sol based of price in sol times percentageROI and return
-   
+    
+  const tokenPrice = await priceLiquidityMonitor.calculateTokenPrice(mintAddress); // Calculate the token price
+  const solPrice = await priceLiquidityMonitor.fetchSolPrice();
+
+  const tokenValueInUSD = tokenPrice * inAmount; // Value of tokens in USD
+  const tokenValueInSOL = tokenValueInUSD / solPrice; // Convert the token value from USD to SOL
+
+  // Calculate the expected out amount in SOL based on the percentage ROI
+  const expectedROI = percentageROI / 100; // Convert percentage to a decimal
+  const outAmountInSOL = tokenValueInSOL * (1 + expectedROI); // Calculate the out amount in SOL after applying the ROI
+
+  return outAmountInSOL;
 }
-
-
 
 
 function isValidPublicKey(key) {
@@ -809,7 +820,7 @@ async function getTokenHoldings(chatId) {
     method: 'GET',
     headers: {
       'accept': 'application/json',
-      'x-api-key': '-ZMCvwqQpkEEYUvd' 
+      'x-api-key': '-ZMCvwqQpkEEYUvd'
     }
   });
 
