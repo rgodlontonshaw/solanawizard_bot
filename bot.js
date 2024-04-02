@@ -719,6 +719,59 @@ async function purchaseToken(chatId, amount) {
   }
 }
 
+async function createLimitOrder(inputMint, outputMint, inAmount, outAmount){
+  const userWalletDoc = await db.collection("userWallets").doc(chatId.toString()).get();
+  const userWalletData = userWalletDoc.data();
+
+  if (!userWalletDoc.exists) {
+    bot.sendMessage(chatId, "❌ Limit order creation failed: Wallet not found.");
+    return;
+  }
+
+  const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+
+  const secretKey = bs58.decode(userWalletData.secretKey);
+  const wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
+  const base = Keypair.generate();
+  
+  const transactions = await (
+    await fetch('https://jup.ag/api/limit/v1/createOrder', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        owner: wallet.publicKey.toString(),
+        inAmount: inAmount, // 1000000 => 1 USDC if inputToken.address is USDC mint
+        outAmount: outAmount,
+        inputMint: inputMint.toString(),
+        outputMint: outputMint.toString(),
+        expiredAt: null, // new Date().valueOf() / 1000,
+        base: base.publicKey.toString(),
+        // referralAccount and name are both optional
+        // provide both to get referral fees
+        // more details in the section below
+        // referralAccount: referral.publicKey.toString(),
+        // referralName: "Referral Name"
+      })
+    })
+  );
+
+  const { tx } = await transactions.json;
+  
+  const transactionBuf = Buffer.from(tx, "base64");
+  var transaction = VersionedTransaction.deserialize(transactionBuf);
+  transaction.sign([wallet.payer, base]);
+
+  const rawTransaction = transaction.serialize();
+  const txid = await connection.sendRawTransaction(rawTransaction, {
+    skipPreflight: true,
+    maxRetries: 2,
+  });
+  await connection.confirmTransaction(txid);
+  console.log(`https://solscan.io/tx/${txid}`);
+}
+
 
 function createPurchaseInstruction(walletPublicKey, tokenAddress, amount) {
   const lamports = amount * solanaWeb3.LAMPORTS_PER_SOL;
