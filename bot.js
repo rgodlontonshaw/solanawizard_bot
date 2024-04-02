@@ -487,18 +487,32 @@ async function handleSell(chatId) {
 
   let tokens = await getUserTokens(chatId);
   let inline_keyboard = [];
-  
+
+  // Iterate through each token
   for (const token of tokens) {
+    // Add token name
     inline_keyboard.push([
       { text: `${token.name}`, callback_data: 'do_nothing' }
+    ]);
+    // Add options for setting limit order, selling by percentage, and selling 100%
+    inline_keyboard.push([
+      { text: `Limit Orders`, callback_data: 'do_nothing' },
+    ]);
+    inline_keyboard.push([
+      { text: `Set Limit Order by % ${token.symbol}`, callback_data: `limit_order_${token.mintAddress}` }, 
+      // { text: `Token % to Sell ${token.symbol}`, callback_data: `limit_order_percent_${token.mintAddress}` },      
+    ]);
+    // Add "Manual" option for selling
+    inline_keyboard.push([
+      { text: ` Manual`, callback_data: 'do_nothing' },
     ]);
     inline_keyboard.push([
       { text: `Sell X% ${token.symbol}`, callback_data: `sell_x_${token.mintAddress}` },
       { text: `Sell 100% ${token.symbol}`, callback_data: `sell_100_${token.mintAddress}` },
     ]);
   }
-  
-  
+
+  // Add "Close" option
   inline_keyboard.push(
     [{ text: '❌ Close', callback_data: 'close' }]
   );
@@ -508,9 +522,10 @@ async function handleSell(chatId) {
     reply_markup: { inline_keyboard: inline_keyboard }
   };
 
-  bot.sendMessage(chatId, "Select sell options:", sellOptions);
+  bot.sendMessage(chatId, "<b>Sell options:</b>\nYou can choose to set a limit order by specifying the percentage, sell a percentage of your tokens instantly, sell all of your tokens instantly, or specify the percentage of tokens to sell.\nPlease select from the options below:", sellOptions);
   console.log(`Handling sell for chatId: ${chatId}`);
 }
+
 
 async function getUserTokens(chatId) {
   // Retrieve the user's public key from the database
