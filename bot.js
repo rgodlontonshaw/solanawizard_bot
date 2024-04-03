@@ -209,11 +209,18 @@ async function start(chatId) {
   const formattedSolBalance = solBalance.toFixed(6);
   solBalanceMain = formattedSolBalance
 
+  const solToUSDRate = await fetchSolToUSDRate();
+
+  const solBalanceUSD = solBalance * solToUSDRate;
+  const formattedSolBalanceUSD = solBalanceUSD.toFixed(2);
+
+
   const welcomeMessage =
     `We make Solana trading easy, fast, and secure. 🚀\n\n` +
     `👤 Your Profile\n\n` +
     `💼 <b>Your Wallet Address:</b> <code>${publicKey.toString()}</code>\n` +
     `💰 <b>Current Balance:</b> <code>${formattedSolBalance} SOL</code>\n` +
+    `💵 <b>Balance in USD:</b> <code>${formattedSolBalanceUSD} USD</code>\n` +
     `🌐 <a href="https://solscan.io/account/${publicKey.toString()}">View Wallet on Solscan</a>\n\n` +
     `Get started by exploring the menu below. Happy trading!`;
 
@@ -224,6 +231,18 @@ async function start(chatId) {
     disable_web_page_preview: true,
     ...KeyboardLayouts.getStartMenuKeyboard(),
   });
+}
+
+async function fetchSolToUSDRate() {
+  try {
+    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+    const data = await response.json();
+    return data.solana.usd;
+  } catch (error) {
+    console.error('Error fetching SOL to USD rate:', error);
+    // You can handle errors here, such as returning a default rate or logging the error
+    return null;
+  }
 }
 
 async function getProfile(chatId) {
