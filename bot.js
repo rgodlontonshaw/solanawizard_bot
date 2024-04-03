@@ -721,8 +721,8 @@ async function purchaseToken(chatId, amount) {
   }
 }
 
-async function createLimitOrder(inputMint, outputMint, inAmount, percentageROI){
-  try{
+async function createLimitOrder(inputMint, outputMint, inAmount, percentageROI, targetPriceUSD = null) {
+  try {
     const userWalletDoc = await db.collection("userWallets").doc(chatId.toString()).get();
     const userWalletData = userWalletDoc.data();
 
@@ -732,39 +732,45 @@ async function createLimitOrder(inputMint, outputMint, inAmount, percentageROI){
     }
 
     const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
-
     const secretKey = bs58.decode(userWalletData.secretKey);
     const wallet = solanaWeb3.Keypair.fromSecretKey(secretKey);
-    const base = Keypair.generate();
+    const base = solanaWeb3.Keypair.generate();
 
-    const transactions = await (
-      await fetch('https://jup.ag/api/limit/v1/createOrder', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          owner: wallet.publicKey.toString(),
-          inAmount: inAmount, // 1000000 => 1 USDC if inputToken.address is USDC mint
-          outAmount: calculateSolOutAmountOnSell(inAmount, inputMint , percentageROI), //todo call dif method on buy pass in boolean
-          inputMint: inputMint.toString(),
-          outputMint: outputMint.toString(),
-          expiredAt: null, // new Date().valueOf() / 1000,
-          base: base.publicKey.toString(),
-          // referralAccount and name are both optional
-          // provide both to get referral fees
-          // more details in the section below
-          // referralAccount: referral.publicKey.toString(),
-          // referralName: "Referral Name"
-        })
+    let outAmountInSOL;
+    if (targetPriceUSD) {
+      const solPrice = await priceLiquidityMonitor.fetchSolPrice();
+      const tokenValueAtTargetPriceUSD = targetPriceUSD * inAmount;
+      outAmountInSOL = tokenValueAtTargetPriceUSD / solPrice;
+    } else {
+      const result = await calculateSolOutAmountOnSellUsingPercentage(inAmount, inputMint, percentageROI);
+      outAmountInSOL = result.outAmountInSOL;
+    }
+
+    const transactionsResponse = await fetch('https://jup.ag/api/limit/v1/createOrder', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        owner: wallet.publicKey.toString(),
+        inAmount: inAmount,
+        outAmount: outAmountInSOL,
+        inputMint: inputMint.toString(),
+        outputMint: outputMint.toString(),
+        // expiredAt: null,  TODO add expire functionality
+        base: base.publicKey.toString(),
       })
-    );
+    });
 
-    const { tx } = await transactions.json;
+    if (!transactionsResponse.ok) {
+      throw new Error(`HTTP error! status: ${transactionsResponse.status}`);
+    }
+
+    const { tx } = await transactionsResponse.json();
 
     const transactionBuf = Buffer.from(tx, "base64");
-    var transaction = VersionedTransaction.deserialize(transactionBuf);
-    transaction.sign([wallet.payer, base]);
+    var transaction = solanaWeb3.VersionedTransaction.deserialize(transactionBuf);
+    transaction.sign([wallet, base]);
 
     const rawTransaction = transaction.serialize();
     const txid = await connection.sendRawTransaction(rawTransaction, {
@@ -772,29 +778,31 @@ async function createLimitOrder(inputMint, outputMint, inAmount, percentageROI){
       maxRetries: 2,
     });
     await connection.confirmTransaction(txid);
-    console.log(`https://solscan.io/tx/${txid}`);
-  }catch(error){
-
+    console.log(`Transaction successful: https://solscan.io/tx/${txid}`);
+  } catch (error) {
+    console.error('Error creating limit order:', error);
+    // Handle error appropriately
   }
 }
 
-async function calculateSolOutAmountOnSell(inAmount,mintAddress,percentageROI){
-    //todo get current sol price
-    //get price in sol of token based off in amount
-    // calculate outAmount in sol based of price in sol times percentageROI and return
-    
-  const tokenPrice = await priceLiquidityMonitor.calculateTokenPrice(mintAddress); // Calculate the token price
+async function calculateSolOutAmountOnSellUsingPercentage(inAmount,mintAddress,percentageROI){
+
+  const tokenPrice = await priceLiquidityMonitor.calculateTokenPrice(mintAddress); 
   const solPrice = await priceLiquidityMonitor.fetchSolPrice();
 
-  const tokenValueInUSD = tokenPrice * inAmount; // Value of tokens in USD
-  const tokenValueInSOL = tokenValueInUSD / solPrice; // Convert the token value from USD to SOL
+  const tokenValueInUSD = tokenPrice * inAmount; 
+  const tokenValueInSOL = tokenValueInUSD / solPrice; 
 
-  // Calculate the expected out amount in SOL based on the percentage ROI
-  const expectedROI = percentageROI / 100; // Convert percentage to a decimal
-  const outAmountInSOL = tokenValueInSOL * (1 + expectedROI); // Calculate the out amount in SOL after applying the ROI
+  const expectedROI = percentageROI / 100; 
+  const outAmountInSOL = tokenValueInSOL * (1 + expectedROI); 
+  const limitOrderPrice = tokenPrice * (1 + expectedROI);
 
-  return outAmountInSOL;
+  return {
+    outAmountInSOL: outAmountInSOL,
+    limitOrderPrice: limitOrderPrice
+  };
 }
+
 
 
 function isValidPublicKey(key) {
